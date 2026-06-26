@@ -1,0 +1,20 @@
+{
+  "css.lint.unknownAtRules": false,
+  "editor.defaultFormatter": "esbenp.prettier-vscode",
+  "files.associations": {
+    "*.css": "tailwindcss"
+  },
+  "tailwindCSS.includeLanguages": {
+    "css": "tailwindcss"
+  },
+  "json.schemas": [
+    {
+      "fileMatch": ["app/components.json", "apps/components.json"],
+      "url": "./.vscode/shadcn-schema.json"
+    },
+    {
+      "fileMatch": ["app/tsconfig.json", "apps/tsconfig.json"],
+      "url": "./.vscode/tsconfig-schema.json"
+    }
+  ]
+}
