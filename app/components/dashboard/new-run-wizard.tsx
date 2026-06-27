@@ -38,6 +38,7 @@ interface Employee {
   name: string
   wallet: string
   amount: string
+  department: string
 }
 
 interface ProofResult {
@@ -55,8 +56,8 @@ export function NewRunWizard() {
     new Date().toLocaleString('default', { month: 'long', year: 'numeric' })
   )
   const [employees, setEmployees] = useState<Employee[]>([
-    { id: '1', name: '', wallet: '', amount: '' },
-    { id: '2', name: '', wallet: '', amount: '' },
+    { id: '1', name: '', wallet: '', amount: '', department: '' },
+    { id: '2', name: '', wallet: '', amount: '', department: '' },
   ])
   const [proofResult, setProofResult] = useState<ProofResult | null>(null)
   const [txHash, setTxHash] = useState<string | null>(null)
@@ -70,7 +71,7 @@ export function NewRunWizard() {
   function addEmployee() {
     setEmployees((prev) => [
       ...prev,
-      { id: Date.now().toString(), name: '', wallet: '', amount: '' },
+      { id: Date.now().toString(), name: '', wallet: '', amount: '', department: '' },
     ])
   }
 
@@ -270,7 +271,7 @@ function InputStep({
     for (let i = start; i < lines.length; i++) {
       const cols = lines[i].split(',').map((c) => c.trim().replace(/"/g, ''))
       if (cols.length < 3) continue
-      const [name, wallet, amountStr] = cols
+      const [name, wallet, amountStr, department = 'General'] = cols
       const amount = parseFloat(amountStr)
       if (!name || !wallet || isNaN(amount)) continue
       parsed.push({
@@ -278,6 +279,7 @@ function InputStep({
         name,
         wallet,
         amount: amountStr,
+        department,
       })
     }
 
@@ -314,6 +316,7 @@ function InputStep({
     <thead>
       <tr className="border-b border-border text-xs text-muted-foreground">
         <th className="px-4 py-2.5 font-medium">Name</th>
+        <th className="px-4 py-2.5 font-medium">Department</th>
         <th className="px-4 py-2.5 font-medium">Stellar Wallet (G...)</th>
         <th className="px-4 py-2.5 text-right font-medium">Amount (USDC)</th>
         <th className="px-4 py-2.5 w-8" />
@@ -330,6 +333,26 @@ function InputStep({
               className="w-full bg-transparent text-foreground placeholder-muted-foreground focus:outline-none text-sm"
             />
           </td>
+
+          <td className="px-4 py-2">
+          <select
+          value={emp.department}
+          onChange={(e) => updateEmployee(emp.id, 'department', e.target.value)}
+          className="bg-transparent text-muted-foreground text-xs focus:outline-none w-full"
+          >
+          <option value="">Dept.</option>
+          <option value="Engineering">Engineering</option>
+          <option value="Design">Design</option>
+          <option value="Marketing">Marketing</option>
+          <option value="Sales">Sales</option>
+          <option value="Finance">Finance</option>
+          <option value="HR">HR</option>
+          <option value="Operations">Operations</option>
+          <option value="General">General</option>
+          </select>
+          </td>
+
+
           <td className="px-4 py-2">
             <input
               value={emp.wallet}
@@ -390,7 +413,7 @@ function InputStep({
         </label>
 
         
-          <a href="data:text/csv;charset=utf-8,name,wallet,amount%0AAlice,GABC...XYZ,3000%0ABob,GDEF...ABC,4500"
+          <a href="data:text/csv;charset=utf-8,name,wallet,amount,department%0AAlice,GABC...XYZ,3000,Engineering%0ABob,GDEF...ABC,4500,Design"
           download="template.csv"
           className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-primary transition-colors"
         >
@@ -695,6 +718,7 @@ function SubmitStep({
       name: e.name,
       wallet: e.wallet,
       amount: Number(e.amount),
+      department: e.department || 'General',
       })),
       status: 'verified',
       })

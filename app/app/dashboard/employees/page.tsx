@@ -1,44 +1,64 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { EyeOff, Users } from 'lucide-react'
+import { EyeOff, Users, RefreshCw } from 'lucide-react'
 import { getPayrollRuns } from '@/lib/payroll-store'
-import { downloadPayslip } from '@/lib/download-payslip'
-import { FileText } from 'lucide-react'
 
-interface Employee {
-  id: string
+interface EmployeeRecord {
   name: string
   wallet: string
-  amount: number
-  cycleId: string
-  date: string
+  latestAmount: number
+  latestCycle: string
+  latestDate: string
+  department: string
+  runsCount: number
+  totalPaid: number
 }
 
 export default function EmployeesPage() {
-  const [employees, setEmployees] = useState<Employee[]>([])
+  const [employees, setEmployees] = useState<EmployeeRecord[]>([])
+  const [filter, setFilter] = useState('All')
 
   useEffect(() => {
+    load()
+  }, [])
+
+  function load() {
     const runs = getPayrollRuns()
-    // Build unique employee list from most recent run
-    // If same wallet appears across runs, take latest
-    const seen = new Map<string, Employee>()
-    for (const run of runs) {
+    const map = new Map<string, EmployeeRecord>()
+
+    // Build from all runs — most recent run wins for amount/cycle
+    for (const run of [...runs].reverse()) {
       for (const emp of run.employees) {
-        if (!seen.has(emp.wallet)) {
-          seen.set(emp.wallet, {
-            id: emp.id,
-            name: emp.name,
+        if (!emp.wallet) continue
+        const existing = map.get(emp.wallet)
+        if (existing) {
+          existing.latestAmount = emp.amount
+          existing.latestCycle = run.cycleId
+          existing.latestDate = run.date
+          existing.runsCount += 1
+          existing.totalPaid += emp.amount
+          if (emp.department) existing.department = emp.department
+        } else {
+          map.set(emp.wallet, {
+            name: emp.name || 'Unknown',
             wallet: emp.wallet,
-            amount: emp.amount,
-            cycleId: run.cycleId,
-            date: run.date,
+            latestAmount: emp.amount,
+            latestCycle: run.cycleId,
+            latestDate: run.date,
+            department: emp.department || 'General',
+            runsCount: 1,
+            totalPaid: emp.amount,
           })
         }
       }
     }
-    setEmployees(Array.from(seen.values()))
-  }, [])
+
+    setEmployees(Array.from(map.values()))
+  }
+
+  const departments = ['All', ...Array.from(new Set(employees.map((e) => e.department)))]
+  const filtered = filter === 'All' ? employees : employees.filter((e) => e.department === filter)
 
   return (
     <div className="mx-auto max-w-7xl">
@@ -48,15 +68,42 @@ export default function EmployeesPage() {
             Employees
           </h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            {employees.length} team member{employees.length !== 1 ? 's' : ''} from your payroll runs.
+            {employees.length} team member{employees.length !== 1 ? 's' : ''} across{' '}
+            {departments.length - 1} department{departments.length !== 2 ? 's' : ''}
           </p>
         </div>
+        <button
+          onClick={load}
+          className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+        >
+          <RefreshCw size={12} />
+          Refresh
+        </button>
       </div>
 
-      <div className="mt-6 flex items-center gap-2 rounded-lg border border-border bg-card px-4 py-2.5 text-xs text-muted-foreground">
+      {/* Department filter */}
+      {departments.length > 2 && (
+        <div className="mt-4 flex gap-2 flex-wrap">
+          {departments.map((dept) => (
+            <button
+              key={dept}
+              onClick={() => setFilter(dept)}
+              className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
+                filter === dept
+                  ? 'bg-primary text-primary-foreground'
+                  : 'bg-secondary text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              {dept}
+            </button>
+          ))}
+        </div>
+      )}
+
+      <div className="mt-4 flex items-center gap-2 rounded-lg border border-border bg-card px-4 py-2.5 text-xs text-muted-foreground">
         <EyeOff className="size-4 text-primary shrink-0" />
-        Salary amounts are committed inside the ZK proof circuit and visible
-        only to authorized admins. They never appear on-chain.
+        Salary amounts are ZK circuit private inputs — they never appear on-chain.
+        Only totals are recorded on Stellar.
       </div>
 
       {employees.length === 0 ? (
@@ -73,72 +120,57 @@ export default function EmployeesPage() {
             <table className="w-full text-left text-sm">
               <thead>
                 <tr className="border-b border-border text-xs uppercase tracking-wide text-muted-foreground">
-                  <th className="px-5 py-3 font-medium">Name</th>
-                  <th className="px-5 py-3 font-medium">Stellar wallet</th>
-                  <th className="px-5 py-3 text-right font-medium">
-                    Last salary
-                  </th>
-                  <th className="px-5 py-3 font-medium">Last paid</th>
+                  <th className="px-5 py-3 font-medium">Employee</th>
+                  <th className="px-5 py-3 font-medium">Department</th>
+                  <th className="px-5 py-3 font-medium">Stellar Wallet</th>
+                  <th className="px-5 py-3 text-right font-medium">Latest Salary</th>
+                  <th className="px-5 py-3 text-right font-medium">Total Paid</th>
+                  <th className="px-5 py-3 font-medium">Last Paid</th>
+                  <th className="px-5 py-3 font-medium">Runs</th>
                   <th className="px-5 py-3 font-medium">Status</th>
-                  <th className="px-5 py-2.5 font-medium">Payslip</th>
                 </tr>
               </thead>
               <tbody>
-                {employees.map((emp) => (
+                {filtered.map((emp) => (
                   <tr
                     key={emp.wallet}
                     className="border-b border-border/70 transition-colors last:border-0 hover:bg-accent/40"
                   >
                     <td className="px-5 py-3.5">
                       <div className="flex items-center gap-3">
-                        <span className="flex size-8 items-center justify-center rounded-full bg-secondary text-xs font-medium text-foreground shrink-0">
-                          {emp.name
-                            .split(' ')
-                            .map((n) => n[0])
-                            .join('')
-                            .toUpperCase()
-                            .slice(0, 2)}
+                        <span className="flex size-8 items-center justify-center rounded-full bg-secondary text-xs font-semibold text-foreground shrink-0">
+                          {emp.name.split(' ').map((n) => n[0]).join('').toUpperCase().slice(0, 2)}
                         </span>
-                        <span className="font-medium text-foreground">
-                          {emp.name}
-                        </span>
+                        <span className="font-medium text-foreground">{emp.name}</span>
                       </div>
+                    </td>
+                    <td className="px-5 py-3.5">
+                      <span className="inline-flex rounded-full bg-secondary px-2.5 py-0.5 text-xs text-muted-foreground">
+                        {emp.department}
+                      </span>
                     </td>
                     <td className="px-5 py-3.5 font-mono text-xs text-muted-foreground">
                       {emp.wallet.slice(0, 8)}...{emp.wallet.slice(-6)}
                     </td>
                     <td className="px-5 py-3.5 text-right font-mono font-semibold text-foreground">
-                      {emp.amount.toLocaleString()} USDC
+                      {emp.latestAmount.toLocaleString()} USDC
+                    </td>
+                    <td className="px-5 py-3.5 text-right font-mono text-foreground">
+                      {emp.totalPaid.toLocaleString()} USDC
                     </td>
                     <td className="px-5 py-3.5 text-xs text-muted-foreground">
-                      {new Date(emp.date).toLocaleDateString('en-US', {
-                        month: 'short',
-                        day: 'numeric',
-                        year: 'numeric',
+                      {new Date(emp.latestDate).toLocaleDateString('en-US', {
+                        month: 'short', day: 'numeric', year: 'numeric',
                       })}
+                    </td>
+                    <td className="px-5 py-3.5 font-mono text-xs text-foreground">
+                      {emp.runsCount}
                     </td>
                     <td className="px-5 py-3.5">
                       <span className="inline-flex rounded-full bg-success/10 px-2.5 py-0.5 text-xs font-medium text-success ring-1 ring-inset ring-success/20">
                         Active
                       </span>
                     </td>
-                    <td className="px-5 py-3.5">
-                    <button
-                    onClick={() => {
-                    const name = JSON.parse(
-                  localStorage.getItem('zerowage_settings') || '{}'
-                  ).companyName
-                  const runs = getPayrollRuns()
-                  const found = runs.find((r) => r.employees.some((e) => e.wallet === emp.wallet))
-                  if (!found) return
-                   downloadPayslip(emp, found, name)
-                      }}
-                     className="inline-flex items-center gap-1.5 rounded-md border border-border bg-background px-3 py-1.5 text-xs text-muted-foreground hover:text-foreground hover:border-primary/40 transition-colors"
-                    >
-                  <FileText size={11} />
-                  PDF
-                 </button>
-                  </td>
                   </tr>
                 ))}
               </tbody>

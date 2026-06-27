@@ -3,6 +3,8 @@
 import { AppShell } from '@/components/app-shell'
 import { useState, useEffect } from 'react'
 import { OnboardingModal } from '@/components/onboarding/onboarding-modal'
+import { Protected } from '@/components/auth/protected'
+
 
 export default function DashboardLayout({
   children,
@@ -27,8 +29,10 @@ export default function DashboardLayout({
 
   return (
     <>
+      <Protected>
       <AppShell>{children}</AppShell>
       <OnboardingModal walletAddress={wallet ?? undefined} />
+      </Protected>
     </>
   )
 }
