@@ -1,8 +1,24 @@
+'use client'
 import Link from 'next/link'
 import { ArrowRight, ShieldCheck, Lock, CircleCheck } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { useWallet } from '@/lib/wallet-context'
+import { useRouter } from 'next/navigation'
 
 export function Hero() {
+
+const { isConnected, connect } = useWallet()
+const router = useRouter()
+
+async function handleLaunch() {
+  if (isConnected) {
+    router.push('/dashboard')
+  } else {
+    await connect()
+    router.push('/dashboard')
+  }
+}
+
   return (
     <section className="relative overflow-hidden">
       {/* subtle grid backdrop */}
@@ -38,12 +54,13 @@ export function Hero() {
           </p>
 
           <div className="mt-9 flex flex-col items-center justify-center gap-3 sm:flex-row">
-            <Button asChild size="lg" className="h-11 px-6 text-[15px]">
-              <Link href="/dashboard">
-                Launch App
-                <ArrowRight className="size-4" />
-              </Link>
-            </Button>
+              <button
+          onClick={handleLaunch}
+          className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium rounded-lg transition-colors"
+           >
+          Launch App
+          <ArrowRight size={13} />
+          </button>
             <Button
               asChild
               size="lg"

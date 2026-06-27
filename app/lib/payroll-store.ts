@@ -3,6 +3,7 @@ export interface PayrollEmployee {
   name: string
   wallet: string
   amount: number
+  department?: string
 }
 
 export interface PayrollRun {

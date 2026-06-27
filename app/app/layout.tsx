@@ -2,6 +2,7 @@ import { Analytics } from '@vercel/analytics/next'
 import type { Metadata, Viewport } from 'next'
 import { Inter, JetBrains_Mono } from 'next/font/google'
 import './globals.css'
+import { WalletProvider } from '@/lib/wallet-context'
 
 const inter = Inter({
   variable: '--font-inter',
@@ -35,9 +36,12 @@ export default function RootLayout({
     <html
       lang="en"
       className={`dark ${inter.variable} ${jetbrainsMono.variable}`}
+      suppressHydrationWarning
     >
       <body className="bg-background font-sans antialiased">
+        <WalletProvider>
         {children}
+        </WalletProvider>
         {process.env.NODE_ENV === 'production' && <Analytics />}
       </body>
     </html>
