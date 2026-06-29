@@ -24,38 +24,38 @@ export default function EmployeesPage() {
   }, [])
 
   function load() {
-    const runs = getPayrollRuns()
-    const map = new Map<string, EmployeeRecord>()
+  const runs = getPayrollRuns().filter((r) => r.status === 'paid')
+  const map = new Map<string, EmployeeRecord>()
 
-    // Build from all runs — most recent run wins for amount/cycle
-    for (const run of [...runs].reverse()) {
-      for (const emp of run.employees) {
-        if (!emp.wallet) continue
-        const existing = map.get(emp.wallet)
-        if (existing) {
-          existing.latestAmount = emp.amount
-          existing.latestCycle = run.cycleId
-          existing.latestDate = run.date
-          existing.runsCount += 1
-          existing.totalPaid += emp.amount
-          if (emp.department) existing.department = emp.department
-        } else {
-          map.set(emp.wallet, {
-            name: emp.name || 'Unknown',
-            wallet: emp.wallet,
-            latestAmount: emp.amount,
-            latestCycle: run.cycleId,
-            latestDate: run.date,
-            department: emp.department || 'General',
-            runsCount: 1,
-            totalPaid: emp.amount,
-          })
-        }
+  for (const run of runs) {
+    for (const emp of run.employees) {
+      if (!emp.wallet) continue
+      const existing = map.get(emp.wallet)
+      if (existing) {
+        // Update with latest run data
+        existing.latestAmount = emp.amount
+        existing.latestCycle = run.cycleId
+        existing.latestDate = run.date
+        existing.runsCount += 1
+        existing.totalPaid += emp.amount  // accumulate across paid runs
+        if (emp.department) existing.department = emp.department
+      } else {
+        map.set(emp.wallet, {
+          name: emp.name || 'Unknown',
+          wallet: emp.wallet,
+          latestAmount: emp.amount,
+          latestCycle: run.cycleId,
+          latestDate: run.date,
+          department: emp.department || 'General',
+          runsCount: 1,
+          totalPaid: emp.amount,
+        })
       }
     }
-
-    setEmployees(Array.from(map.values()))
   }
+
+  setEmployees(Array.from(map.values()))
+}
 
   const departments = ['All', ...Array.from(new Set(employees.map((e) => e.department)))]
   const filtered = filter === 'All' ? employees : employees.filter((e) => e.department === filter)

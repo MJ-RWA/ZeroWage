@@ -226,7 +226,7 @@ export default function RunDetailPage() {
               <DetailRow label="Constraints">660</DetailRow>
               <DetailRow label="Network">Stellar Testnet</DetailRow>
               <DetailRow label="Contract">
-                CB2JUH7W...SMRDUD
+                CCOEJ6QC...SMRDUD
               </DetailRow>
             </div>
           </section>
@@ -271,8 +271,14 @@ export default function RunDetailPage() {
                         {emp.amount.toLocaleString()} USDC
                       </td>
                       <td className="px-5 py-3.5 text-right">
-                        <span className="inline-flex rounded-full bg-success/10 px-2 py-0.5 text-xs font-medium text-success ring-1 ring-inset ring-success/20">
-                          Paid
+                         <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ring-1 ring-inset ${
+                          run.status === 'paid'
+                          ? 'bg-success/10 text-success ring-success/20'
+                          : run.status === 'approved'
+                          ? 'bg-blue-500/10 text-blue-400 ring-blue-500/20'
+                          : 'bg-yellow-500/10 text-yellow-400 ring-yellow-500/20'
+                          }`}>
+                          {run.status === 'paid' ? 'Paid' : run.status === 'approved' ? 'Pending' : 'Draft'}
                         </span>
                       </td>
                     </tr>

@@ -15,7 +15,7 @@ const incidents = [
   {
     date: 'Jun 21, 2026',
     title: 'Initial deployment',
-    desc: 'ZeroWage deployed to Stellar testnet. Soroban verifier contract live at CB2JUH7W...SMRDUD.',
+    desc: 'ZeroWage deployed to Stellar testnet. Soroban verifier contract live at CCOEJ6QC...SMRDUD.',
     status: 'resolved',
   },
 ]

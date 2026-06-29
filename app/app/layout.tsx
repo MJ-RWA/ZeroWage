@@ -20,6 +20,11 @@ export const metadata: Metadata = {
   description:
     'Generate Groth16 zero-knowledge proofs for every payroll run while keeping salaries private on Stellar.',
   generator: 'v0.app',
+  icons: {
+    icon: '/icon.svg',
+    shortcut: '/icon.svg',
+    apple: '/apple-icon.png',
+  },
 }
 
 export const viewport: Viewport = {

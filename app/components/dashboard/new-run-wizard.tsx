@@ -19,6 +19,8 @@ import {
   Upload,
   Share2,
   FileText,
+  Clock,
+  Copy,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
@@ -67,6 +69,7 @@ export function NewRunWizard() {
     (e) => e.name && e.wallet && parseFloat(e.amount) > 0
   )
   const total = included.reduce((s, e) => s + parseFloat(e.amount), 0)
+  const [draftId, setDraftId] = useState<string | null>(null)
 
   function addEmployee() {
     setEmployees((prev) => [
@@ -85,6 +88,153 @@ export function NewRunWizard() {
     )
   }
 
+  function DraftStep({
+  draftId,
+  total,
+  count,
+  proof,
+  cycleId,
+  onApproved,
+}: {
+  draftId: string
+  total: number
+  count: number
+  proof: any
+  cycleId: string
+  onApproved: () => void
+}) {
+  const [copied, setCopied] = useState(false)
+  const [checking, setChecking] = useState(false)
+  const approvalUrl =
+    typeof window !== 'undefined'
+      ? `${window.location.origin}/approve/${draftId}`
+      : ''
+
+  // Check if already approved
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const { getPayrollRunById } = require('@/lib/payroll-store')
+      const run = getPayrollRunById(draftId)
+      if (run?.status === 'approved') {
+        clearInterval(interval)
+        onApproved()
+      }
+    }, 2000)
+    return () => clearInterval(interval)
+  }, [draftId, onApproved])
+
+  function copyLink() {
+    navigator.clipboard.writeText(approvalUrl)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
+  }
+
+  // Self-approve if no approver set
+  async function selfApprove() {
+    setChecking(true)
+    const { updateRunStatus } = await import('@/lib/payroll-store')
+    updateRunStatus(draftId, 'approved', {
+      approvedAt: new Date().toUTCString(),
+      approvalSignature: 'self-approved',
+    })
+    onApproved()
+    setChecking(false)
+  }
+
+  const settings = typeof window !== 'undefined'
+    ? JSON.parse(localStorage.getItem('zerowage_settings') || '{}')
+    : {}
+  const hasApprover = !!settings.approverWallet
+
+  return (
+    <div className="p-6">
+      <div className="flex items-center gap-3 mb-6">
+        <span className="flex size-10 items-center justify-center rounded-lg bg-yellow-500/10 text-yellow-400">
+          <Clock className="size-5" />
+        </span>
+        <div>
+          <h2 className="text-base font-semibold text-foreground">
+            Proof ready — awaiting approval
+          </h2>
+          <p className="text-sm text-muted-foreground">
+            Share the approval link with your CFO or approver.
+          </p>
+        </div>
+      </div>
+
+      {/* Run summary */}
+      <div className="rounded-lg border border-border bg-background p-4 space-y-2 mb-5">
+        <div className="flex justify-between text-sm">
+          <span className="text-muted-foreground">Cycle</span>
+          <span className="font-mono text-foreground">{cycleId}</span>
+        </div>
+        <div className="flex justify-between text-sm">
+          <span className="text-muted-foreground">Total</span>
+          <span className="font-mono font-semibold text-foreground">
+            {total.toLocaleString()} USDC
+          </span>
+        </div>
+        <div className="flex justify-between text-sm">
+          <span className="text-muted-foreground">Recipients</span>
+          <span className="font-mono text-foreground">{count}</span>
+        </div>
+        <div className="flex justify-between text-sm">
+          <span className="text-muted-foreground">Status</span>
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-yellow-500/10 px-2.5 py-0.5 text-xs font-mono text-yellow-400">
+            DRAFT
+          </span>
+        </div>
+      </div>
+
+      {/* Approval link */}
+      <div className="rounded-lg border border-border bg-background p-4 mb-5">
+        <div className="text-xs text-muted-foreground uppercase tracking-widest mb-2">
+          Approval link — share with CFO
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="font-mono text-xs text-primary truncate flex-1">
+            {approvalUrl}
+          </span>
+          <button
+            onClick={copyLink}
+            className="flex items-center gap-1.5 rounded border border-border px-2.5 py-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors shrink-0"
+          >
+            {copied
+              ? <><Check size={11} className="text-success" /> Copied</>
+              : <><Copy size={11} /> Copy</>
+            }
+          </button>
+        </div>
+        <p className="text-xs text-muted-foreground mt-2">
+          The CFO will see total and recipient count only — no salary amounts.
+        </p>
+      </div>
+
+      {/* Polling indicator */}
+      <div className="flex items-center gap-2 text-xs text-muted-foreground mb-4">
+        <div className="size-2 rounded-full bg-yellow-400 animate-pulse" />
+        Waiting for approval... (checking every 2 seconds)
+      </div>
+
+      {/* Skip approval if no approver configured */}
+      {!hasApprover && (
+        <div className="rounded-lg border border-border bg-secondary/30 p-4">
+          <p className="text-xs text-muted-foreground mb-3">
+            No approver wallet configured in Settings. You can approve this run yourself or add an approver in Settings → Approver wallet.
+          </p>
+          <button
+            onClick={selfApprove}
+            disabled={checking}
+            className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50"
+          >
+            <Check size={14} />
+            {checking ? 'Approving...' : 'Self-approve and continue'}
+          </button>
+        </div>
+      )}
+    </div>
+  )
+}
   return (
     <div className="mx-auto max-w-4xl">
       <div className="flex items-center gap-3">
@@ -126,19 +276,56 @@ export function NewRunWizard() {
             cycleId={cycleId}
           />
         )}
-        {step === 3 && (
-          <GenerateStep
-            employees={included}
-            total={total}
-            cycleId={cycleId}
-            onDone={(result) => {
-              setProofResult(result)
-              setStep(4)
-            }}
-          />
+         {step === 3 && (
+         <GenerateStep
+          employees={included}
+          total={total}
+          cycleId={cycleId}
+          onDone={(result) => {
+          setProofResult(result)
+
+          // Save as DRAFT — don't go to submit yet
+          const settings = JSON.parse(
+          localStorage.getItem('zerowage_settings') || '{}'
+          )
+          const runId = Date.now().toString()
+          const draftRun = {
+          id: runId,
+          cycleId,
+          total,
+          recipients: included.length,
+          proofTxHash: '',
+          paymentTxHash: '',
+          date: new Date().toUTCString(),
+          employees: included.map((e, i) => ({
+          id: String(i),
+          name: e.name,
+          wallet: e.wallet,
+          amount: e.amount,
+          department: e.department || 'General',
+          })),
+          status: 'draft' as const,
+          proofData: result,
+          approverWallet: settings.approverWallet || '',
+          }
+
+         const { savePayrollRun } = require('@/lib/payroll-store')
+         savePayrollRun(draftRun)
+         setDraftId(runId)
+         setProofResult(result)
+         setStep(4)
+        }}
+        />
         )}
-        {step === 4 && proofResult && (
-          <VerifyStep proof={proofResult} total={total} count={included.length} />
+        {step === 4 && proofResult && draftId && (
+        <DraftStep
+        draftId={draftId}
+        total={total}
+        count={included.length}
+        proof={proofResult}
+        cycleId={cycleId}
+        onApproved={() => setStep(5)}
+        />
         )}
         {step === 5 && (
           <SubmitStep
@@ -155,45 +342,46 @@ export function NewRunWizard() {
           />
         )}
 
-        {step !== 3 && (
-          <div className="flex items-center justify-between border-t border-border px-6 py-4">
-            <Button
-              variant="outline"
-              className="border-border bg-background hover:bg-accent"
-              disabled={step === 1}
-              onClick={() => setStep((s) => Math.max(1, s - 1))}
-            >
-              Back
-            </Button>
-            {step < 5 ? (
-              <Button
-                className="gap-1.5"
-                disabled={step === 1 && included.length === 0}
-                onClick={() => {
-                  if (step === 2) {
-                    setStep(3)
-                  } else {
-                    setStep((s) => s + 1)
-                  }
-                }}
-              >
-                {step === 2 ? 'Generate proof' : 'Continue'}
-                <ArrowRight className="size-4" />
-              </Button>
-            ) : txHash ? (
-              <Button asChild className="gap-1.5">
-                <Link href="/dashboard/runs">
-                  <Check className="size-4" />
-                  View runs
-                </Link>
-              </Button>
-            ) : null}
-          </div>
-        )}
+        {step !== 3 && step !== 4 && (
+        <div className="flex items-center justify-between border-t border-border px-6 py-4">
+        <Button
+        variant="outline"
+        className="border-border bg-background hover:bg-accent"
+        disabled={step === 1}
+        onClick={() => setStep((s) => Math.max(1, s - 1))}
+        >
+        Back
+       </Button>
+
+       {step < 5 ? (
+       <Button
+       className="gap-1.5"
+       disabled={step === 1 && included.length === 0}
+       onClick={() => {
+       if (step === 2) {
+            setStep(3)
+          } else {
+            setStep((s) => s + 1)
+          }
+        }}
+       >
+        {step === 2 ? "Generate proof" : "Continue"}
+        <ArrowRight className="size-4" />
+      </Button>
+      ) : txHash ? (
+      <Button asChild className="gap-1.5">
+        <Link href="/dashboard/runs">
+          <Check className="size-4" />
+          View runs
+        </Link>
+      </Button>
+      ) : null}
+     </div>
+    )}
       </div>
     </div>
-  )
-}
+   )
+  }
 
 function Stepper({ step }: { step: number }) {
   return (
@@ -518,6 +706,7 @@ function GenerateStep({
   const [isComplete, setIsComplete] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const ranRef = useRef(false)
+  
 
   useEffect(() => {
     if (ranRef.current) return
@@ -720,12 +909,12 @@ function SubmitStep({
       amount: Number(e.amount),
       department: e.department || 'General',
       })),
-      status: 'verified',
+      status: 'paid',
       })
 
-setTxHash(result.proofTxHash)
-setPaymentTxHash(result.paymentTxHash)
-setPaymentResults(result.payments)
+      setTxHash(result.proofTxHash)
+      setPaymentTxHash(result.paymentTxHash)
+      setPaymentResults(result.payments)
       setPaymentTxHash(result.paymentTxHash)
       setPaymentResults(result.payments)
     } catch (e: any) {
@@ -764,7 +953,7 @@ setPaymentResults(result.payments)
         </div>
         <div className="flex justify-between">
           <span className="text-muted-foreground">Contract</span>
-          <span className="text-foreground">CB2JUH7W...SMRDUD</span>
+          <span className="text-foreground">CCOEJ6QC...SMRDUD</span>
         </div>
         <a
           href={`https://stellar.expert/explorer/testnet/tx/${txHash}`}
@@ -801,7 +990,7 @@ setPaymentResults(result.payments)
            <button
            onClick={() => {
            const { downloadReceipt } = require('@/lib/receipt')
-      // Get from store
+           // Get from store
            const runs = JSON.parse(localStorage.getItem('zerowage_runs') || '[]')
            const run = runs.find((r: any) => r.proofTxHash === txHash)
            if (run) downloadReceipt(run)
@@ -899,7 +1088,7 @@ setPaymentResults(result.payments)
         </div>
         <div className="flex items-center justify-between">
           <span className="text-sm text-muted-foreground">Contract</span>
-          <span className="font-mono text-xs text-foreground">CB2JUH7W...SMRDUD</span>
+          <span className="font-mono text-xs text-foreground">CCOEJ6QC...SMRDUD</span>
         </div>
         <div className="flex items-center gap-2 rounded-md bg-secondary px-3 py-2 text-xs text-muted-foreground">
           <Lock className="size-3.5 text-success" />

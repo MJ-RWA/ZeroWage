@@ -6,6 +6,29 @@ import { Plus, CheckCircle, ExternalLink } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { getPayrollRuns, type PayrollRun } from '@/lib/payroll-store'
 
+function StatusBadge({ status }: { status: PayrollRun['status'] }) {
+   if (status === 'paid') {
+     return (
+       <span className="inline-flex items-center gap-1.5 rounded-full bg-success/10 px-2.5 py-1 text-xs font-mono font-medium text-success ring-1 ring-inset ring-success/20">
+         <CheckCircle size={10} />
+         PAID
+       </span>
+     )
+   }
+  if (status === 'approved') {
+    return (
+      <span className="inline-flex items-center gap-1.5 rounded-full bg-blue-500/10 px-2.5 py-1 text-xs font-mono font-medium text-blue-400 ring-1 ring-inset ring-blue-500/20">
+        APPROVED
+      </span>
+    )
+  }
+  return (
+    <span className="inline-flex items-center gap-1.5 rounded-full bg-yellow-500/10 px-2.5 py-1 text-xs font-mono font-medium text-yellow-400 ring-1 ring-inset ring-yellow-500/20">
+      DRAFT
+    </span>
+  )
+}
+
 export default function RunsPage() {
   const [runs, setRuns] = useState<PayrollRun[]>([])
 
@@ -13,7 +36,7 @@ export default function RunsPage() {
     setRuns(getPayrollRuns())
   }, [])
 
-  const verified = runs.filter((r) => r.status === 'verified').length
+  const paid = runs.filter((r) => r.status === 'paid').length
 
   return (
     <div className="mx-auto max-w-7xl">
@@ -22,9 +45,9 @@ export default function RunsPage() {
           <h1 className="text-2xl font-semibold tracking-tight text-foreground">
             Payroll runs
           </h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            {runs.length} runs · {verified} verified
-          </p>
+<p className="mt-1 text-sm text-muted-foreground">
+               {runs.length} runs · {paid} paid
+             </p>
         </div>
         <Button asChild className="gap-1.5">
           <Link href="/dashboard/new">
@@ -87,10 +110,7 @@ export default function RunsPage() {
                       {run.total.toLocaleString()} USDC
                     </td>
                     <td className="px-5 py-4">
-                      <span className="inline-flex items-center gap-1.5 rounded-full bg-success/10 px-2.5 py-1 text-xs font-mono font-medium text-success ring-1 ring-inset ring-success/20">
-                        <CheckCircle size={10} />
-                        VERIFIED
-                      </span>
+                    <StatusBadge status={run.status} />
                     </td>
                     <td className="px-5 py-4 font-mono text-xs text-primary">
                       {run.proofTxHash.slice(0, 8)}...{run.proofTxHash.slice(-6)}

@@ -1,29 +1,174 @@
 #![no_std]
-use soroban_sdk::{contract, contractimpl, contracttype, symbol_short, Env, Vec, String, Bytes};
+use soroban_sdk::{
+    contract, contracterror, contractimpl, contracttype,
+    crypto::bn254::{
+        Bn254G1Affine, Bn254G2Affine, Fr,
+        BN254_G1_SERIALIZED_SIZE, BN254_G2_SERIALIZED_SIZE,
+    },
+    symbol_short, vec, Bytes, Env, String, Symbol, Vec, U256,
+};
+
+// Storage keys
+const VK_KEY: Symbol = symbol_short!("VK");
+
+// ── Errors ────────────────────────────────────────────────────────────────────
+
+#[contracterror]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, PartialOrd, Ord)]
+#[repr(u32)]
+pub enum VerifierError {
+    MalformedVerifyingKey   = 1,
+    VerificationKeyNotSet   = 2,
+    MalformedProof          = 3,
+    MalformedPublicSignals  = 4,
+    ProofAlreadyUsed        = 5,
+    ProofVerificationFailed = 6,
+}
+
+// ── On-chain payroll record ────────────────────────────────────────────────────
 
 #[contracttype]
 #[derive(Clone)]
 pub struct PayrollRun {
-    pub employer: String,
-    pub cycle_id: String,
-    pub total_usdc: i128,
-    pub n_recipients: u32,
+    pub employer:       String,
+    pub cycle_id:       String,
+    pub total_usdc:     i128,
+    pub n_recipients:   u32,
     pub proof_verified: bool,
-    pub timestamp: u64,
+    pub timestamp:      u64,
 }
 
-#[contracttype]
+// ── Internal types ─────────────────────────────────────────────────────────────
+
 #[derive(Clone)]
-pub struct Proof {
-    pub a_x: Bytes,
-    pub a_y: Bytes,
-    pub b_x1: Bytes,
-    pub b_x2: Bytes,
-    pub b_y1: Bytes,
-    pub b_y2: Bytes,
-    pub c_x: Bytes,
-    pub c_y: Bytes,
+struct VerificationKey {
+    alpha: Bn254G1Affine,
+    beta:  Bn254G2Affine,
+    gamma: Bn254G2Affine,
+    delta: Bn254G2Affine,
+    ic:    Vec<Bn254G1Affine>,
 }
+
+#[derive(Clone)]
+struct Proof {
+    a: Bn254G1Affine,
+    b: Bn254G2Affine,
+    c: Bn254G1Affine,
+}
+
+// ── Byte-slice helper ──────────────────────────────────────────────────────────
+
+fn take<const N: usize>(
+    bytes: &Bytes,
+    pos:   &mut u32,
+    err:   VerifierError,
+) -> Result<[u8; N], VerifierError> {
+    let end = pos.checked_add(N as u32).ok_or(err)?;
+    if end > bytes.len() {
+        return Err(err);
+    }
+    let mut arr = [0u8; N];
+    bytes.slice(*pos..end).copy_into_slice(&mut arr);
+    *pos = end;
+    Ok(arr)
+}
+
+// ── Deserialization ────────────────────────────────────────────────────────────
+
+impl VerificationKey {
+    fn from_bytes(env: &Env, bytes: &Bytes) -> Result<Self, VerifierError> {
+        let mut pos = 0u32;
+        let e = VerifierError::MalformedVerifyingKey;
+
+        let alpha = Bn254G1Affine::from_array(env, &take::<BN254_G1_SERIALIZED_SIZE>(bytes, &mut pos, e)?);
+        let beta  = Bn254G2Affine::from_array(env, &take::<BN254_G2_SERIALIZED_SIZE>(bytes, &mut pos, e)?);
+        let gamma = Bn254G2Affine::from_array(env, &take::<BN254_G2_SERIALIZED_SIZE>(bytes, &mut pos, e)?);
+        let delta = Bn254G2Affine::from_array(env, &take::<BN254_G2_SERIALIZED_SIZE>(bytes, &mut pos, e)?);
+
+        let ic_len = u32::from_be_bytes(take::<4>(bytes, &mut pos, e)?);
+        let mut ic = Vec::new(env);
+        for _ in 0..ic_len {
+            ic.push_back(Bn254G1Affine::from_array(
+                env,
+                &take::<BN254_G1_SERIALIZED_SIZE>(bytes, &mut pos, e)?,
+            ));
+        }
+
+        if pos != bytes.len() || ic_len == 0 {
+            return Err(e);
+        }
+        Ok(Self { alpha, beta, gamma, delta, ic })
+    }
+}
+
+impl Proof {
+    fn from_bytes(env: &Env, bytes: &Bytes) -> Result<Self, VerifierError> {
+        let mut pos = 0u32;
+        let e = VerifierError::MalformedProof;
+
+        let a = Bn254G1Affine::from_array(env, &take::<BN254_G1_SERIALIZED_SIZE>(bytes, &mut pos, e)?);
+        let b = Bn254G2Affine::from_array(env, &take::<BN254_G2_SERIALIZED_SIZE>(bytes, &mut pos, e)?);
+        let c = Bn254G1Affine::from_array(env, &take::<BN254_G1_SERIALIZED_SIZE>(bytes, &mut pos, e)?);
+
+        if pos != bytes.len() {
+            return Err(e);
+        }
+        Ok(Self { a, b, c })
+    }
+}
+
+fn parse_public_signals(
+    env:   &Env,
+    bytes: &Bytes,
+) -> Result<Vec<Fr>, VerifierError> {
+    let mut pos = 0u32;
+    let e = VerifierError::MalformedPublicSignals;
+
+    let len = u32::from_be_bytes(take::<4>(bytes, &mut pos, e)?);
+    let mut signals = Vec::new(env);
+    for _ in 0..len {
+        let arr  = take::<32>(bytes, &mut pos, e)?;
+        let u256 = U256::from_be_bytes(env, &Bytes::from_array(env, &arr));
+        signals.push_back(Fr::from_u256(u256));
+    }
+
+    if pos != bytes.len() {
+        return Err(e);
+    }
+    Ok(signals)
+}
+
+// ── Core Groth16 verification ──────────────────────────────────────────────────
+
+fn verify_groth16(
+    env:        &Env,
+    vk:         VerificationKey,
+    proof:      Proof,
+    pub_signals: Vec<Fr>,
+) -> Result<bool, VerifierError> {
+    if pub_signals.len() + 1 != vk.ic.len() {
+        return Err(VerifierError::MalformedVerifyingKey);
+    }
+
+    let bn = env.crypto().bn254();
+
+    // vk_x = IC[0] + sum(pub_signals[i] * IC[i+1])
+    let mut vk_x = vk.ic.get(0).unwrap();
+    for (s, v) in pub_signals.iter().zip(vk.ic.iter().skip(1)) {
+        let prod = bn.g1_mul(&v, &s);
+        vk_x = bn.g1_add(&vk_x, &prod);
+    }
+
+    // Groth16 pairing equation:
+    // e(-A, B) * e(alpha, beta) * e(vk_x, gamma) * e(C, delta) == 1
+    let neg_a = -proof.a;
+    let vp1 = vec![env, neg_a,    vk.alpha, vk_x, proof.c];
+    let vp2 = vec![env, proof.b,  vk.beta,  vk.gamma, vk.delta];
+
+    Ok(bn.pairing_check(vp1, vp2))
+}
+
+// ── Contract ───────────────────────────────────────────────────────────────────
 
 #[contract]
 pub struct PayrollVerifier;
@@ -31,43 +176,90 @@ pub struct PayrollVerifier;
 #[contractimpl]
 impl PayrollVerifier {
 
-    pub fn verify_and_record(
-        env: Env,
-        employer: String,
-        cycle_id: String,
-        total_usdc: i128,
-        n_recipients: u32,
-        proof: Proof,
-        public_inputs: Vec<Bytes>,
-    ) -> bool {
-
-        let verified = Self::verify_groth16(&env, &proof, &public_inputs);
-
-        if verified {
-            let run = PayrollRun {
-                employer: employer.clone(),
-                cycle_id: cycle_id.clone(),
-                total_usdc,
-                n_recipients,
-                proof_verified: true,
-                timestamp: env.ledger().timestamp(),
-            };
-
-            env.storage()
-                .persistent()
-                .set(&(employer.clone(), cycle_id.clone()), &run);
-
-            env.events().publish(
-                (symbol_short!("PAYROLL"), symbol_short!("VERIFIED")),
-                (employer, cycle_id, total_usdc, n_recipients),
-            );
-        }
-
-        verified
+    /// Store the Groth16 verification key on-chain.
+    /// Must be called once after deployment with the encoded vk bytes.
+    pub fn set_vk(env: Env, vk_bytes: Bytes) -> Result<(), VerifierError> {
+        // Parse first — malformed keys fail fast and cannot be stored
+        let _vk = VerificationKey::from_bytes(&env, &vk_bytes)?;
+        env.storage().instance().set(&VK_KEY, &vk_bytes);
+        Ok(())
     }
 
+    /// Verify a Groth16 proof and record the payroll run on-chain.
+    /// Prevents replay attacks via a proof nullifier stored in persistent storage.
+    pub fn verify_and_record(
+        env:          Env,
+        employer:     String,
+        cycle_id:     String,
+        total_usdc:   i128,
+        n_recipients: u32,
+        proof_bytes:  Bytes,
+        pub_signals_bytes: Bytes,
+    ) -> Result<bool, VerifierError> {
+
+         // ── 1. Nullifier check (replay protection) ─────────────────────────
+// Nullifier = first 32 bytes of sha256(proof_bytes), stored as Bytes
+let nullifier_bytes: Bytes = {
+    let h = env.crypto().sha256(&proof_bytes);
+    let mut b = Bytes::new(&env);
+    for byte in h.to_array().iter() {
+        b.push_back(*byte);
+    }
+    b
+};
+let nullifier_key = (symbol_short!("NULL"), nullifier_bytes.clone());
+
+if env.storage().persistent().has(&nullifier_key) {
+    return Err(VerifierError::ProofAlreadyUsed);
+}
+
+        // ── 2. Load verification key ───────────────────────────────────────
+        let vk_bytes: Bytes = env
+            .storage()
+            .instance()
+            .get(&VK_KEY)
+            .ok_or(VerifierError::VerificationKeyNotSet)?;
+
+        // ── 3. Deserialize proof and public signals ────────────────────────
+        let vk         = VerificationKey::from_bytes(&env, &vk_bytes)?;
+        let proof      = Proof::from_bytes(&env, &proof_bytes)?;
+        let pub_signals = parse_public_signals(&env, &pub_signals_bytes)?;
+
+        // ── 4. Real BN254 Groth16 pairing verification ────────────────────
+        let verified = verify_groth16(&env, vk, proof, pub_signals)?;
+
+        if !verified {
+            return Err(VerifierError::ProofVerificationFailed);
+        }
+
+        // ── 5. Store nullifier (prevents proof reuse) ─────────────────────
+        env.storage().persistent().set(&nullifier_key, &true);
+
+        // ── 6. Record payroll run on-chain ────────────────────────────────
+        let run = PayrollRun {
+            employer:       employer.clone(),
+            cycle_id:       cycle_id.clone(),
+            total_usdc,
+            n_recipients,
+            proof_verified: true,
+            timestamp:      env.ledger().timestamp(),
+        };
+
+        let run_key = (employer.clone(), cycle_id.clone());
+        env.storage().persistent().set(&run_key, &run);
+
+        // ── 7. Emit event ─────────────────────────────────────────────────
+        env.events().publish(
+            (symbol_short!("PAYROLL"), symbol_short!("VERIFIED")),
+            (employer, cycle_id, total_usdc, n_recipients),
+        );
+
+        Ok(true)
+    }
+
+    /// Fetch a stored payroll run by employer + cycle_id.
     pub fn get_run(
-        env: Env,
+        env:      Env,
         employer: String,
         cycle_id: String,
     ) -> Option<PayrollRun> {
@@ -76,64 +268,44 @@ impl PayrollVerifier {
             .get(&(employer, cycle_id))
     }
 
-    fn verify_groth16(
-        env: &Env,
-        proof: &Proof,
-        _public_inputs: &Vec<Bytes>,
-    ) -> bool {
-        !proof.a_x.is_empty()
-            && !proof.a_y.is_empty()
-            && !proof.b_x1.is_empty()
-            && !proof.c_x.is_empty()
-    }
+    /// Check if a proof nullifier has already been used.
+      pub fn is_nullifier_used(env: Env, proof_bytes: Bytes) -> bool {
+    let nullifier_bytes: Bytes = {
+        let h = env.crypto().sha256(&proof_bytes);
+        let mut b = Bytes::new(&env);
+        for byte in h.to_array().iter() {
+            b.push_back(*byte);
+        }
+        b
+    };
+    let nullifier_key = (symbol_short!("NULL"), nullifier_bytes);
+    env.storage().persistent().has(&nullifier_key)
+}
 }
 
 #[cfg(test)]
 mod test {
     use super::*;
-    use soroban_sdk::{testutils::Ledger, Env, String, Vec, Bytes};
+    use soroban_sdk::{testutils::Ledger, Env, String, Bytes};
 
     #[test]
-    fn test_verify_and_record() {
+    fn test_vk_not_set_returns_error() {
         let env = Env::default();
         let contract_id = env.register(PayrollVerifier, ());
         let client = PayrollVerifierClient::new(&env, &contract_id);
 
         env.ledger().set_timestamp(1234567890);
 
-        let proof = Proof {
-            a_x: Bytes::from_slice(&env, &[1u8; 32]),
-            a_y: Bytes::from_slice(&env, &[2u8; 32]),
-            b_x1: Bytes::from_slice(&env, &[3u8; 32]),
-            b_x2: Bytes::from_slice(&env, &[4u8; 32]),
-            b_y1: Bytes::from_slice(&env, &[5u8; 32]),
-            b_y2: Bytes::from_slice(&env, &[6u8; 32]),
-            c_x: Bytes::from_slice(&env, &[7u8; 32]),
-            c_y: Bytes::from_slice(&env, &[8u8; 32]),
-        };
-
-        let public_inputs: Vec<Bytes> = Vec::new(&env);
-
-        let result = client.verify_and_record(
+        // Should fail because VK not set
+        let result = client.try_verify_and_record(
             &String::from_str(&env, "EMPLOYER1"),
             &String::from_str(&env, "JUNE-2026"),
             &18500,
             &5,
-            &proof,
-            &public_inputs,
+            &Bytes::from_slice(&env, &[1u8; 32]),
+            &Bytes::from_slice(&env, &[0u8; 36]),
         );
 
-        assert!(result);
-
-        let run = client.get_run(
-            &String::from_str(&env, "EMPLOYER1"),
-            &String::from_str(&env, "JUNE-2026"),
-        );
-
-        assert!(run.is_some());
-        let run = run.unwrap();
-        assert_eq!(run.total_usdc, 18500);
-        assert_eq!(run.n_recipients, 5);
-        assert!(run.proof_verified);
+        assert!(result.is_err());
     }
 }
