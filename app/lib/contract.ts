@@ -3,7 +3,6 @@ import {
   Networks,
   TransactionBuilder,
   BASE_FEE,
-  xdr,
   nativeToScVal,
   rpc,
   Operation,
@@ -11,7 +10,7 @@ import {
   Horizon,
 } from '@stellar/stellar-sdk'
 
-export const CONTRACT_ID = 'CB2JUH7WZEFYDQTK53AAWINVB62BTPBJNZ7P5ZP2ELNHIDQEV3SMRDUD'
+export const CONTRACT_ID = 'CCOEJ6QC6ZGGA2GIY72IW3MDN6LNJHQSB2XWRZR3WSLE3PVVE6QVUYAP'
 export const RPC_URL = 'https://soroban-testnet.stellar.org'
 export const HORIZON_URL = 'https://horizon-testnet.stellar.org'
 export const NETWORK_PASSPHRASE = Networks.TESTNET
@@ -55,31 +54,75 @@ export async function submitPayrollToContract(
   const horizon = new Horizon.Server(HORIZON_URL)
   const contract = new Contract(CONTRACT_ID)
 
-  const toBytes = (hex: string) =>
-    nativeToScVal(
-      Buffer.from(hex.replace('0x', '').padStart(64, '0'), 'hex'),
-      { type: 'bytes' }
-    )
+  // Encode proof as binary: pi_a (64 bytes) + pi_b (128 bytes) + pi_c (64 bytes)
+function encodeProofBytes(
+  proof: { pi_a: string[]; pi_b: string[][]; pi_c: string[] }
+): Buffer {
+  function fieldToBytes(val: string): Buffer {
+    const n = BigInt(val)
+    const buf = Buffer.alloc(32)
+    let tmp = n
+    for (let i = 31; i >= 0; i--) {
+      buf[i] = Number(tmp & 0xffn)
+      tmp >>= 8n
+    }
+    return buf
+  }
 
-  const proofArg = xdr.ScVal.scvMap([
-    new xdr.ScMapEntry({ key: xdr.ScVal.scvSymbol('a_x'),  val: toBytes(params.proof.pi_a[0]) }),
-    new xdr.ScMapEntry({ key: xdr.ScVal.scvSymbol('a_y'),  val: toBytes(params.proof.pi_a[1]) }),
-    new xdr.ScMapEntry({ key: xdr.ScVal.scvSymbol('b_x1'), val: toBytes(params.proof.pi_b[0][0]) }),
-    new xdr.ScMapEntry({ key: xdr.ScVal.scvSymbol('b_x2'), val: toBytes(params.proof.pi_b[0][1]) }),
-    new xdr.ScMapEntry({ key: xdr.ScVal.scvSymbol('b_y1'), val: toBytes(params.proof.pi_b[1][0]) }),
-    new xdr.ScMapEntry({ key: xdr.ScVal.scvSymbol('b_y2'), val: toBytes(params.proof.pi_b[1][1]) }),
-    new xdr.ScMapEntry({ key: xdr.ScVal.scvSymbol('c_x'),  val: toBytes(params.proof.pi_c[0]) }),
-    new xdr.ScMapEntry({ key: xdr.ScVal.scvSymbol('c_y'),  val: toBytes(params.proof.pi_c[1]) }),
+  function encodeG1(point: string[]): Buffer {
+    return Buffer.concat([
+      fieldToBytes(point[0]),
+      fieldToBytes(point[1]),
+    ])
+  }
+
+  function encodeG2(point: string[][]): Buffer {
+    return Buffer.concat([
+      fieldToBytes(point[0][1]),
+      fieldToBytes(point[0][0]),
+      fieldToBytes(point[1][1]),
+      fieldToBytes(point[1][0]),
+    ])
+  }
+
+  return Buffer.concat([
+    encodeG1(proof.pi_a),
+    encodeG2(proof.pi_b),
+    encodeG1(proof.pi_c),
   ])
+}
 
-  const publicInputsArg = xdr.ScVal.scvVec(
-    params.publicSignals.map((s) =>
-      nativeToScVal(
-        Buffer.from(BigInt(s).toString(16).padStart(64, '0'), 'hex'),
-        { type: 'bytes' }
-      )
-    )
-  )
+// Encode public signals: 4-byte count prefix + each signal as 32 bytes
+function encodePublicSignals(signals: string[]): Buffer {
+  const lenBuf = Buffer.alloc(4)
+  lenBuf.writeUInt32BE(signals.length, 0)
+
+  const sigBufs = signals.map((s) => {
+    const n = BigInt(s)
+    const buf = Buffer.alloc(32)
+    let tmp = n
+    for (let i = 31; i >= 0; i--) {
+      buf[i] = Number(tmp & 0xffn)
+      tmp >>= 8n
+    }
+    return buf
+  })
+
+  return Buffer.concat([lenBuf, ...sigBufs])
+}
+
+const proofBuf = encodeProofBytes(params.proof)
+const pubSigBuf = encodePublicSignals(params.publicSignals)
+
+const proofScVal = nativeToScVal(
+  Buffer.from(proofBuf),
+  { type: 'bytes' }
+)
+
+const pubSigScVal = nativeToScVal(
+  Buffer.from(pubSigBuf),
+  { type: 'bytes' }
+)
 
   // ── Step 1: Verify proof on Soroban contract ──────────────────────────────
 
@@ -96,8 +139,8 @@ export async function submitPayrollToContract(
         nativeToScVal(params.cycleId, { type: 'string' }),
         nativeToScVal(BigInt(params.totalUsdc), { type: 'i128' }),
         nativeToScVal(params.nRecipients, { type: 'u32' }),
-        proofArg,
-        publicInputsArg
+        proofScVal,
+        pubSigScVal
       )
     )
     .setTimeout(300)
@@ -121,8 +164,8 @@ export async function submitPayrollToContract(
         nativeToScVal(params.cycleId, { type: 'string' }),
         nativeToScVal(BigInt(params.totalUsdc), { type: 'i128' }),
         nativeToScVal(params.nRecipients, { type: 'u32' }),
-        proofArg,
-        publicInputsArg
+        proofScVal,
+        pubSigScVal
       )
     )
     .setTimeout(300)

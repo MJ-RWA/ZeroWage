@@ -106,7 +106,7 @@ export default function DocsPage() {
               { label: 'Sum correctness', value: 'The circuit proves sum(salaries) == claimed_total. The blockchain knows the total but not the breakdown.' },
               { label: 'Minimum threshold', value: 'The circuit enforces each salary >= min_salary. Underpayment is cryptographically impossible without a failed proof.' },
               { label: 'Trusted setup', value: 'We use the Hermez perpetual Powers of Tau ceremony (2^12). Security assumes at least one participant destroyed their randomness.' },
-              { label: 'Contract address', value: 'CB2JUH7WZEFYDQTK53AAWINVB62BTPBJNZ7P5ZP2ELNHIDQEV3SMRDUD (Stellar testnet)' },
+              { label: 'Contract address', value: 'CCOEJ6QC6ZGGA2GIY72IW3MDN6LNJHQSB2XWRZR3WSLE3PVVE6QVUYAP (Stellar testnet)' },
             ].map((row) => (
               <div key={row.label} className="flex gap-6 px-5 py-4 flex-wrap">
                 <div className="text-sm font-medium text-foreground w-40 shrink-0">{row.label}</div>

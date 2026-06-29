@@ -277,7 +277,7 @@ function ProofDetailPanel({ run }: { run: PayrollRun }) {
           <div className="mt-3 rounded-lg border border-border bg-background px-4 py-3 text-xs text-muted-foreground">
             Contract{' '}
             <span className="font-mono text-foreground">
-              CB2JUH7W…SMRDUD
+              CCOEJ6QC…SMRDUD
             </span>
             . Salaries remain confidential; only correctness is revealed.
           </div>

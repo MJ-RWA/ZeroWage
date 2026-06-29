@@ -421,7 +421,7 @@ export function PayslipDocument({ employee, run, companyName }: PayslipProps) {
           <View style={s.proofRow}>
             <Text style={s.proofLabel}>Contract</Text>
             <Text style={s.proofValueSmall}>
-              CB2JUH7WZEFYDQTK53AAWINVB62BTPBJNZ7P5ZP2ELNHIDQEV3SMRDUD
+              CCOEJ6QCZEFYDQTK53AAWINVB62BTPBJNZ7P5ZP2ELNHIDQEV3SMRDUD
             </Text>
           </View>
           <View style={s.proofRow}>

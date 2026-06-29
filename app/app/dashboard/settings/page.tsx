@@ -38,16 +38,24 @@ function Field({
 const SETTINGS_KEY = 'zerowage_settings'
 
 interface Settings {
+  adminName: string
   companyName: string
   treasuryWallet: string
   defaultAsset: string
+  role: string
+  teamSize: string
+  approverWallet: string
 }
 
 export default function SettingsPage() {
   const [settings, setSettings] = useState<Settings>({
-    companyName: '',
-    treasuryWallet: '',
-    defaultAsset: 'USDC',
+   adminName: '',
+   companyName: '',
+   treasuryWallet: '',
+   defaultAsset: 'USDC',
+   role: '',
+   teamSize: '',
+   approverWallet: '',
   })
   const [saved, setSaved] = useState(false)
 
@@ -117,6 +125,16 @@ export default function SettingsPage() {
               setSettings((prev) => ({ ...prev, treasuryWallet: v }))
             }
           />
+             
+         <Field
+            label="Approver wallet"
+            value={settings.approverWallet || ''}
+            hint="CFO or designated approver Stellar address"
+            onChange={(v) =>
+            setSettings((prev) => ({ ...prev, approverWallet: v }))
+           }
+          />
+
           <Field
             label="Default asset"
             value={settings.defaultAsset}
@@ -154,7 +172,7 @@ export default function SettingsPage() {
           />
           <Field
             label="Verifier contract"
-            value="CB2JUH7WZEFYDQTK53AAWINVB62BTPBJNZ7P5ZP2ELNHIDQEV3SMRDUD"
+            value="CCOEJ6QCZEFYDQTK53AAWINVB62BTPBJNZ7P5ZP2ELNHIDQEV3SMRDUD"
             hint="Soroban verifier on Stellar testnet"
             readOnly
           />

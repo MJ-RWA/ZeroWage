@@ -16,12 +16,12 @@ export function KpiRow() {
     const runs = getPayrollRuns()
     const totalPaid = runs.reduce((s, r) => s + r.total, 0)
     const totalRecipients = runs.reduce((s, r) => s + r.recipients, 0)
-    setStats({
-      totalPaid,
-      totalRuns: runs.length,
-      totalRecipients,
-      verifiedRuns: runs.filter((r) => r.status === 'verified').length,
-    })
+setStats({
+       totalPaid,
+       totalRuns: runs.length,
+       totalRecipients,
+       verifiedRuns: runs.filter((r) => r.status === 'paid').length,
+     })
   }, [])
 
   const kpis = [

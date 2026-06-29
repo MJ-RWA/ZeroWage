@@ -36,7 +36,7 @@ const endpoints = [
     response: `{
   "verified": true,
   "txHash": "e6b361204bb3a0d71a79ff7e...",
-  "contractId": "CB2JUH7WZEFYDQTK53AA...",
+  "contractId": "CCOEJ6QCZEFYDQTK53AA...",
   "ledger": 54219003,
   "timestamp": "2026-06-21T02:14:00Z"
 }`,
@@ -86,7 +86,7 @@ export default function ApiPage() {
           <div className="text-sm font-medium text-foreground mb-3">Contract Details</div>
           {[
             { label: 'Network', value: 'Stellar Testnet' },
-            { label: 'Contract ID', value: 'CB2JUH7WZEFYDQTK53AAWINVB62BTPBJNZ7P5ZP2ELNHIDQEV3SMRDUD' },
+            { label: 'Contract ID', value: 'CCOEJ6QCZEFYDQTK53AAWINVB62BTPBJNZ7P5ZP2ELNHIDQEV3SMRDUD' },
             { label: 'RPC URL', value: 'https://soroban-testnet.stellar.org' },
             { label: 'Network Passphrase', value: 'Test SDF Network ; September 2015' },
           ].map((row) => (

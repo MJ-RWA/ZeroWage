@@ -29,7 +29,7 @@ export function generatePayrollReceipt(run: PayrollRun): string {
   lines.push(`Circuit:        payroll.circom`)
   lines.push(`Constraints:    660`)
   lines.push(`Network:        Stellar Testnet`)
-  lines.push(`Contract:       CB2JUH7WZEFYDQTK53AAWINVB62BTPBJNZ7P5ZP2ELNHIDQEV3SMRDUD`)
+  lines.push(`Contract:       CCOEJ6QCZEFYDQTK53AAWINVB62BTPBJNZ7P5ZP2ELNHIDQEV3SMRDUD`)
   lines.push('')
   lines.push('Proof Transaction:')
   lines.push(`  ${run.proofTxHash}`)
@@ -95,7 +95,7 @@ export function downloadReceiptJson(run: PayrollRun): void {
       circuit: 'payroll.circom',
       constraints: 660,
       network: 'Stellar Testnet',
-      contractId: 'CB2JUH7WZEFYDQTK53AAWINVB62BTPBJNZ7P5ZP2ELNHIDQEV3SMRDUD',
+      contractId: 'CCOEJ6QCZEFYDQTK53AAWINVB62BTPBJNZ7P5ZP2ELNHIDQEV3SMRDUD',
       proofTxHash: run.proofTxHash,
       paymentTxHash: run.paymentTxHash,
     },

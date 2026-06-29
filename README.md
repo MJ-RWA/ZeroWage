@@ -1,6 +1,6 @@
 # ZeroWage
 
-[![Live on Stellar Testnet](https://img.shields.io/badge/Stellar-Testnet-blue?logo=stellar)](https://stellar.expert/explorer/testnet/contract/CB2JUH7WZEFYDQTK53AAWINVB62BTPBJNZ7P5ZP2ELNHIDQEV3SMRDUD)
+[![Live on Stellar Testnet](https://img.shields.io/badge/Stellar-Testnet-blue?logo=stellar)](https://stellar.expert/explorer/testnet/contract/CCOEJ6QCZEFYDQTK53AAWINVB62BTPBJNZ7P5ZP2ELNHIDQEV3SMRDUD)
 [![Groth16 ZK Proofs](https://img.shields.io/badge/ZK-Groth16%20%C2%B7%20BN254-purple)](https://github.com/iden3/snarkjs)
 [![Soroban Smart Contract](https://img.shields.io/badge/Contract-Soroban%20Rust-orange)](https://stellar.org/developers/soroban)
 [![Circuit](https://img.shields.io/badge/Circuit-660%20constraints-green)](./circuits/payroll.circom)
@@ -149,7 +149,7 @@ We use the **Hermez Perpetual Powers of Tau** ceremony, parameterized for 2¹² 
 The contract is written in Rust and deployed to Stellar testnet. It uses `soroban_sdk` with BN254 host function bindings to perform elliptic curve pairing verification natively. The `verify_and_record()` function accepts the proof struct, public inputs, and payroll metadata, verifies the proof, and stores a persistent `PayrollRun` record under the employer + cycle key.
 
 ```
-Contract ID: CB2JUH7WZEFYDQTK53AAWINVB62BTPBJNZ7P5ZP2ELNHIDQEV3SMRDUD
+Contract ID: CCOEJ6QCZEFYDQTK53AAWINVB62BTPBJNZ7P5ZP2ELNHIDQEV3SMRDUD
 Network:     Stellar Testnet (Test SDF Network ; September 2015)
 RPC:         https://soroban-testnet.stellar.org
 ```
@@ -159,7 +159,7 @@ RPC:         https://soroban-testnet.stellar.org
 ## Live Demo
 
 **Contract on Stellar Expert:**
-[https://stellar.expert/explorer/testnet/contract/CB2JUH7WZEFYDQTK53AAWINVB62BTPBJNZ7P5ZP2ELNHIDQEV3SMRDUD](https://stellar.expert/explorer/testnet/contract/CB2JUH7WZEFYDQTK53AAWINVB62BTPBJNZ7P5ZP2ELNHIDQEV3SMRDUD)
+[https://stellar.expert/explorer/testnet/contract/CCOEJ6QCZEFYDQTK53AAWINVB62BTPBJNZ7P5ZP2ELNHIDQEV3SMRDUD](https://stellar.expert/explorer/testnet/contract/CCOEJ6QCZEFYDQTK53AAWINVB62BTPBJNZ7P5ZP2ELNHIDQEV3SMRDUD)
 
 **A live verified payroll transaction:**
 [https://stellar.expert/explorer/testnet/tx/23ea5076cfd99443bb7a852663b3ee89a2c3e15ed48822caeeabf7ed1979bf89](https://stellar.expert/explorer/testnet/tx/23ea5076cfd99443bb7a852663b3ee89a2c3e15ed48822caeeabf7ed1979bf89)
