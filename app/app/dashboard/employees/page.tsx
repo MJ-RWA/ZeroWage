@@ -3,6 +3,8 @@
 import { useState, useEffect } from 'react'
 import { EyeOff, Users, RefreshCw } from 'lucide-react'
 import { getPayrollRuns } from '@/lib/payroll-store'
+import { downloadPayslip, downloadAllPayslips } from '@/lib/download-payslip'
+import { FileText } from 'lucide-react'
 
 interface EmployeeRecord {
   name: string
@@ -128,6 +130,7 @@ export default function EmployeesPage() {
                   <th className="px-5 py-3 font-medium">Last Paid</th>
                   <th className="px-5 py-3 font-medium">Runs</th>
                   <th className="px-5 py-3 font-medium">Status</th>
+                  <th className="px-5 py-2.5 font-medium">Payslip</th>
                 </tr>
               </thead>
               <tbody>
@@ -171,6 +174,25 @@ export default function EmployeesPage() {
                         Active
                       </span>
                     </td>
+                    <td className="px-5 py-3.5">
+                    <button
+                      onClick={() => {
+                    const runs = JSON.parse(localStorage.getItem('zerowage_runs') || '[]')
+                    const latestRun = runs.find((r: any) =>
+                    r.employees?.some((e: any) => e.wallet === emp.wallet)
+                    )
+                  if (!latestRun) return
+                  const empRecord = latestRun.employees.find((e: any) => e.wallet === emp.wallet)
+                  if (!empRecord) return
+                  const settings = JSON.parse(localStorage.getItem('zerowage_settings') || '{}')
+                  downloadPayslip(empRecord, latestRun, settings.companyName)
+                  }}
+                    className="inline-flex items-center gap-1.5 rounded-md border border-border bg-background px-3 py-1.5 text-xs text-muted-foreground hover:text-foreground hover:border-primary/40 transition-colors"
+                     >
+                    <FileText size={11} />
+                    PDF
+                   </button>
+                   </td>
                   </tr>
                 ))}
               </tbody>

@@ -11,6 +11,7 @@ import { CheckCircle, ExternalLink } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { downloadReceipt, downloadReceiptJson } from '@/lib/receipt'
 import { Download, Share2 } from 'lucide-react'
+import { toast } from 'sonner'
 
 export default function DashboardPage() {
   const [runs, setRuns] = useState<PayrollRun[]>([])
@@ -132,19 +133,21 @@ export default function DashboardPage() {
                         <Download className="size-4" />
                          Receipt (.json)
                          </Button>
-
-                       <Button
-                       variant="outline"
-                      className="gap-1.5 border-border bg-card hover:bg-accent"
-                      onClick={() => {
-                      navigator.clipboard.writeText(
-                      `${window.location.origin}/verify/${run.proofTxHash}`
-                      )
-                       }}
+                    
+                        {run.proofTxHash && (
+                        <Button
+                        variant="outline"
+                        className="gap-1.5 border-border bg-card hover:bg-accent"
+                        onClick={async () => {
+                        const url = `${window.location.origin}/verify/${run.proofTxHash}`
+                        await navigator.clipboard.writeText(url)
+                        toast.success('Attestation link copied')
+                        }}
                         >
-                       <Share2 className="size-4" />
+                        <Share2 className="size-4" />
                         Copy attestation link
-                       </Button>
+                        </Button>
+                        )} 
 
                           <a
                             href={`https://stellar.expert/explorer/testnet/tx/${run.proofTxHash}`}

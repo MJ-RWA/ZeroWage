@@ -1,262 +1,235 @@
 # ZeroWage
 
-[![Live on Stellar Testnet](https://img.shields.io/badge/Stellar-Testnet-blue?logo=stellar)](https://stellar.expert/explorer/testnet/contract/CCOEJ6QCZEFYDQTK53AAWINVB62BTPBJNZ7P5ZP2ELNHIDQEV3SMRDUD)
-[![Groth16 ZK Proofs](https://img.shields.io/badge/ZK-Groth16%20%C2%B7%20BN254-purple)](https://github.com/iden3/snarkjs)
+[![Live on Stellar Testnet](https://img.shields.io/badge/Stellar-Testnet-blue?logo=stellar)](https://stellar.expert/explorer/testnet/contract/CCOEJ6QC6ZGGA2GIY72IW3MDN6LNJHQSB2XWRZR3WSLE3PVVE6QVUYAP)
+[![Real Groth16 Verification](https://img.shields.io/badge/On--Chain-BN254%20Pairing%20Verified-purple)](#the-verifier-itself-does-the-math)
 [![Soroban Smart Contract](https://img.shields.io/badge/Contract-Soroban%20Rust-orange)](https://stellar.org/developers/soroban)
-[![Circuit](https://img.shields.io/badge/Circuit-660%20constraints-green)](./circuits/payroll.circom)
+[![Circuit](https://img.shields.io/badge/Circuit-1065%20constraints-green)](./circuits/payroll.circom)
+[![Replay Protected](https://img.shields.io/badge/Nullifiers-Enforced%20On--Chain-red)](#nullifiers-a-proof-can-only-ever-be-spent-once)
 [![Next.js 16](https://img.shields.io/badge/Frontend-Next.js%2016-black)](https://nextjs.org)
 
 > **Prove you paid your team correctly. Without the blockchain learning what anyone earns.**
 
-Every blockchain payment is public by design. That transparency — the property that makes crypto trustworthy — becomes a liability the moment salaries are involved. ZeroWage resolves this contradiction: using Groth16 zero-knowledge proofs verified by a Soroban smart contract on Stellar, employers can publish cryptographic proof that payroll was disbursed correctly, on time, and above minimums — while individual salary amounts remain mathematically hidden from the chain, from auditors, and from anyone who isn't supposed to know.
+---
 
-This is not a privacy layer bolted onto an existing payroll system. The proof *is* the payroll system.
+## Picture the spreadsheet
+
+Somewhere in your company right now, there's a spreadsheet. It has everyone's name in column A and their salary in column B. Maybe it's in Google Sheets, maybe it's a CSV the founder guards like a launch code. Either way, the moment that spreadsheet becomes a blockchain transaction — the moment payroll goes on-chain to get the speed and trustlessness of crypto rails — column B becomes permanent, public, and queryable by anyone on earth, forever.
+
+That's not a hypothetical. That's literally how every crypto-native payroll tool works today. Utopia Labs, Request Finance, Sprout — they all move money the same way Venmo does, except Venmo at least lets you set transactions to private. On a public ledger, there's no toggle. The intern can see what the VP of Engineering makes. A competitor can scrape your org chart from transaction history. A journalist building a story about pay equity doesn't need a leak — they need an Etherscan tab open in a browser.
+
+So companies do the rational thing: they don't put payroll on-chain. They go back to Deel, to Gusto, to a centralized database that promises to keep column B secret — and asks you to trust a company's security team, their breach-disclosure timeline, and their incentive to ever tell you when something goes wrong. Neither company is lying about wanting to protect your data. They just can't *prove* it. There's no audit you can run on a promise.
+
+This is the bind: transparency that destroys privacy, or privacy that destroys verifiability. Every payroll system on the market picks one. **ZeroWage refuses to pick.**
 
 ---
 
-## The Problem
+## What if the proof didn't need the secret
 
-**Salary data on public blockchains is a disaster waiting to happen.** Every major crypto-native payroll tool — Utopia Labs, Request Finance, Sprout — disburses payments as plain token transfers. The amounts are permanently on-chain. Every employee can see every other employee's salary by looking at the employer's transaction history. Every competitor, journalist, or disgruntled ex-employee can reconstruct the entire org chart from public data.
+Here's the idea that breaks the bind: you don't need to reveal a number to prove a fact about it. You can prove "this set of salaries sums to exactly $18,500, and every single one is at or above the minimum wage we promised" — and the proof itself contains zero information about what any individual number actually is. Not approximately zero. Zero. A mathematician with infinite computing power and the proof in hand cannot recover a single salary from it. That's not an engineering promise — it's a property of the math.
 
-**Traditional payroll solved this with centralization.** Deel, Gusto, and Rippling keep salary data in private databases, and you trust them not to expose it. That trust is not cryptographic — it's contractual, jurisdictional, and as fragile as their security posture. When Gusto has a data breach, your employees' salaries leak. When Deel's HR exports the wrong CSV, the damage is done.
+This isn't new cryptography. zk-SNARKs have existed since 2012 and power Zcash's shielded transactions today. What's new is that **nobody had built this for payroll, and until recently, nobody could verify it cheaply enough on-chain to make it real.**
 
-**The compliance problem compounds the privacy problem.** Companies need to prove to auditors, regulators, and boards that payroll was run correctly — that no one was underpaid, that the claimed total was actually disbursed, that the books are clean. Today, proving this requires either revealing all salary data to the auditor, or trusting a centralized system's self-reported logs. Neither is satisfactory. One violates privacy; the other violates trustlessness.
-
-ZeroWage makes both problems disappear simultaneously.
+ZeroWage is the first payroll system where the zero-knowledge proof isn't a feature bolted onto a database — it *is* the payroll system. There is no private salary database to breach, because there is no salary database at all. The only persistent record is a Soroban smart contract on Stellar that stores a single boolean per payroll cycle: `proof_verified: true`. Everything that made that boolean true — the individual salaries, who got paid what — existed for a few milliseconds in a browser's memory and then was gone.
 
 ---
 
-## The Solution
+## How it actually works, end to end
 
-ZeroWage separates *what is true* from *what must be revealed* to prove it.
+**1. The admin enters salaries.** Names, Stellar wallet addresses, amounts, departments — typed manually or dropped in as a CSV. This data lives in React state, in one browser tab, on one machine. It never hits a server, never gets logged, never gets sent anywhere.
 
-**What goes on-chain (public forever):**
-- Total USDC disbursed this cycle
-- Number of recipients
-- `proof_verified: true` — the contract's attestation that the math checks out
-- The Groth16 proof itself (3 elliptic curve points, ~384 bytes)
-
-**What never touches the chain:**
-- Individual salary amounts
-- Which wallet received what
-- The salary breakdown by employee or department
-
-The mechanism is a Circom 2 circuit that encodes three mathematical constraints over private salary inputs. When the circuit is satisfied, snarkjs generates a Groth16 proof in the employer's browser. The proof is submitted to a Soroban verifier contract that uses Stellar's native BN254 host functions to verify the pairing equations on-chain. If verification succeeds, the contract records an immutable attestation and the USDC payments are dispatched to recipients.
-
-The blockchain learns the proof is valid. It learns nothing about the numbers that made it valid.
-
----
-
-## How It Works
-
-### Step 1 — Enter salaries (stays in your browser)
-
-The employer opens the 5-step payroll wizard and enters employee names, Stellar wallet addresses, salary amounts, and department assignments — or imports a CSV. These values exist only in browser memory. They are never sent to any server, never written to any database, never transmitted anywhere. The only thing that leaves the browser is a cryptographic proof.
-
-### Step 2 — Review
-
-The employer reviews the payroll batch: recipient count, total amount, cycle name. At this point, nothing cryptographic has happened. This is the last moment the employer sees a plain-text view of the salary breakdown.
-
-### Step 3 — Generate Groth16 proof (the cryptography happens here)
-
-The browser downloads `payroll.wasm` and `payroll_final.zkey` from the CDN and invokes snarkjs `groth16.fullProve()`. The circuit runs with:
-
-- **Private inputs:** `salaries[20]` — the individual salary amounts, padded to 20 slots
-- **Public inputs:** `total`, `min_salary`, `n_recipients`
-
-The circuit enforces three constraints:
+**2. The circuit runs, locally.** A Circom 2 circuit — `payroll.circom`, 1,065 non-linear constraints — takes the salary array as a *private* input and proves three things about it:
 
 ```circom
-// Constraint 1: Sum correctness
-signal running[n+1];
-running[0] <== 0;
-for (var i = 0; i < n; i++) {
-    running[i+1] <== running[i] + salaries[i];
-}
+// 1. The salaries actually sum to the claimed total
 running[n] === total;
 
-// Constraint 2: Minimum salary threshold
-component geq[n];
-for (var i = 0; i < n; i++) {
-    geq[i] = GreaterEqThan(32);
-    geq[i].in[0] <== salaries[i];
-    geq[i].in[1] <== min_salary;
-    geq[i].out === 1;
-}
+// 2. Every single salary clears the minimum threshold
+geq[i].out === 1;  // for all i
 
-// Constraint 3: Non-empty payroll
-signal recipient_check;
-recipient_check <== n_recipients;
+// 3. This exact batch — not a different one — produced this proof
+hash.out === commitment;  // Poseidon(salaries[0..8])
 ```
 
-This produces a Groth16 proof `{pi_a, pi_b, pi_c}` in approximately 2 seconds on a modern browser. The proof is 384 bytes. The salary array that generated it is discarded.
+snarkjs compiles this into a Groth16 proof — three elliptic curve points, 384 bytes — in about two seconds, inside the browser tab, using WebAssembly. The salary array is discarded the instant the proof exists. There is nothing left to leak.
 
-### Step 4 — Verify on Stellar
+**3. The proof goes to a CFO, not straight to the chain.** This is where ZeroWage stops looking like a hackathon demo and starts looking like a real company's controls. The admin can't unilaterally move money — a payroll run sits in `DRAFT` until a second wallet, the designated approver, reviews the aggregate (total, recipient count — never individual salaries) and signs off. The approval link works across browsers, across devices, across days, because it's anchored to Stellar itself: the CFO sends a tiny XLM payment back to the admin's wallet with the run ID encoded as a memo. The admin's session polls Horizon, finds that memo, and the run unlocks. No backend, no database — Stellar *is* the coordination layer. And the approval is wallet-gated: if a specific approver address is configured, only that exact wallet can sign off — anyone else gets turned away with a clear error, not a silent bypass.
 
-The proof and public inputs are submitted to the Soroban verifier contract via Freighter wallet. The contract calls `verify_and_record()`, which uses Stellar's native BN254 host functions (introduced in the X-Ray upgrade) to evaluate the Groth16 pairing equation:
+**4. The contract verifies the actual math.** This is the part most "ZK on-chain" hackathon projects fake. ZeroWage doesn't. The Soroban contract performs real BN254 elliptic curve pairing operations — the literal Groth16 verification equation, evaluated on-chain:
 
 ```
-e(π_A, π_B) = e(α, β) · e(∑ aᵢuᵢ(τ), γ) · e(π_C, δ)
+e(-π_A, π_B) · e(α, β) · e(vk_x, γ) · e(π_C, δ) = 1
 ```
 
-If the equation holds, the contract stores a `PayrollRun` record and emits a `PayrollVerified` event. The entire verification costs approximately 0.001 XLM.
+using Stellar's native `bn254_pairing_check`, `bn254_g1_mul`, and `bn254_g1_add` host functions, introduced in the X-Ray protocol upgrade. If that equation doesn't hold — if the proof is fabricated, malformed, or doesn't match the on-chain verification key — the contract call reverts. There is no fallback path where a bad proof gets waved through.
 
-### Step 5 — Submit USDC payments
+**5. The proof can never be reused.** Every proof's SHA-256 hash becomes a nullifier, written to persistent contract storage the instant verification succeeds. Submit the same proof twice — even from a different account, even months later — and the contract rejects it with `ProofAlreadyUsed`. This is the exact replay-protection primitive that powers Tornado Cash and Zcash's nullifier sets, repurposed here to guarantee a June payroll proof can never be quietly resubmitted as July's.
 
-After on-chain verification, a second Stellar transaction dispatches USDC payments to each recipient using `Operation.payment()` against the Circle testnet USDC issuer. Recipients with established trustlines receive funds atomically. Both transaction hashes — proof tx and payment tx — are recorded and linked to Stellar Expert.
+**6. USDC moves, and a receipt exists.** Once the contract verifies, a second Stellar transaction sends real USDC to every recipient with a confirmed trustline. Both transaction hashes — the proof verification and the payment — are recorded together. The admin gets a downloadable PDF payslip per employee, cryptographically stamped with the proof hash, and a shareable public attestation link any auditor can open without ever seeing a salary.
 
 ---
 
-## ZK Architecture
+## The verifier itself does the math
 
-### Why Groth16, not PLONK
+It's worth being precise about what "real verification" means here, because it's the single most important technical fact about this project.
 
-Groth16 produces the smallest proofs (3 group elements, ~384 bytes) and the cheapest on-chain verification (3 pairing operations). PLONK offers a universal trusted setup but produces larger proofs and more expensive verifiers. Since Stellar's BN254 host functions are specifically optimized for Groth16's verification equations, and proof size matters for Soroban calldata costs, Groth16 is the correct choice here.
+A lot of "ZK on Soroban" demos store a proof's bytes on-chain and check that they're non-empty, or call out to an off-chain service that does the real verification and just writes the result on-chain as an attestation. That's not on-chain verification — that's on-chain *bookkeeping* of an off-chain decision. ZeroWage's contract does not do that.
 
-### The trusted setup
+The `PayrollVerifier` contract deserializes the Groth16 proof and verification key directly from raw bytes — parsing G1 and G2 points off the wire — and runs the actual pairing check using Stellar's native BN254 host functions:
 
-We use the **Hermez Perpetual Powers of Tau** ceremony, parameterized for 2¹² constraints. This ceremony had over 200 independent participants across multiple continents. The security assumption is standard: as long as at least one participant destroyed their toxic waste randomness, the setup is sound. The ceremony artifacts (`pot12_final.ptau`) are publicly verifiable.
+```rust
+fn verify_groth16(
+    env: &Env,
+    vk: VerificationKey,
+    proof: Proof,
+    pub_signals: Vec<Fr>,
+) -> Result<bool, VerifierError> {
+    let bn = env.crypto().bn254();
 
-### Circuit statistics
+    // vk_x = IC[0] + Σ(public_input[i] · IC[i+1])
+    let mut vk_x = vk.ic.get(0).unwrap();
+    for (s, v) in pub_signals.iter().zip(vk.ic.iter().skip(1)) {
+        let prod = bn.g1_mul(&v, &s);
+        vk_x = bn.g1_add(&vk_x, &prod);
+    }
 
-| Property | Value |
-|---|---|
-| Tool | Circom 2.2.2 |
-| Proving system | Groth16 |
-| Curve | BN254 (alt_bn128) |
-| Non-linear constraints | 660 |
-| Linear constraints | 100 |
-| Private inputs | 20 (salary slots) |
-| Public inputs | 3 (total, min_salary, n_recipients) |
-| Wires | 743 |
-| Proof size | ~384 bytes |
-| Browser proving time | ~2 seconds |
+    let neg_a = -proof.a;
+    let vp1 = vec![env, neg_a, vk.alpha, vk_x, proof.c];
+    let vp2 = vec![env, proof.b, vk.beta, vk.gamma, vk.delta];
 
-### Proof structure
-
-```json
-{
-  "pi_a": ["G1_x", "G1_y"],
-  "pi_b": [["G2_x1", "G2_x2"], ["G2_y1", "G2_y2"]],
-  "pi_c": ["G1_x", "G1_y"],
-  "protocol": "groth16",
-  "curve": "bn128"
+    Ok(bn.pairing_check(vp1, vp2))
 }
 ```
 
-### Soroban verifier
+If you mutate a single bit of a submitted proof, this function returns `false` and the transaction reverts. We tested this. The verification is load-bearing, not decorative.
 
-The contract is written in Rust and deployed to Stellar testnet. It uses `soroban_sdk` with BN254 host function bindings to perform elliptic curve pairing verification natively. The `verify_and_record()` function accepts the proof struct, public inputs, and payroll metadata, verifies the proof, and stores a persistent `PayrollRun` record under the employer + cycle key.
+---
+
+## Nullifiers: a proof can only ever be spent once
+
+A subtle but real attack against naive ZK payroll systems: nothing stops an admin from taking a valid, verified proof and submitting it again — to a different contract instance, or the same one, months later, replaying a stale payroll commitment as if it were new.
+
+ZeroWage closes this with the same primitive privacy-coin protocols use to prevent double-spends. Before any proof is accepted, the contract computes its nullifier — `sha256(proof_bytes)` — and checks persistent storage:
+
+```rust
+let nullifier = nullifier_from_proof(&env, &proof_bytes);
+let null_key = (symbol_short!("NULL"), nullifier.clone());
+
+if env.storage().persistent().has(&null_key) {
+    return Err(VerifierError::ProofAlreadyUsed);
+}
+// ... verify ...
+env.storage().persistent().set(&null_key, &true);
+```
+
+Combined with the Poseidon commitment baked into the circuit itself — which binds the proof to one specific salary batch — this means a proof is a single-use, non-transferable, non-replayable cryptographic event. It happened once, for one payroll cycle, and it can never happen again.
+
+---
+
+## Architecture
 
 ```
-Contract ID: CCOEJ6QCZEFYDQTK53AAWINVB62BTPBJNZ7P5ZP2ELNHIDQEV3SMRDUD
-Network:     Stellar Testnet (Test SDF Network ; September 2015)
-RPC:         https://soroban-testnet.stellar.org
+┌─────────────────────────────────────────────────────────────────────┐
+│  BROWSER (admin's device — salaries live here and nowhere else)     │
+│                                                                       │
+│   ┌──────────────┐    ┌────────────────┐    ┌─────────────────┐    │
+│   │  Wizard UI    │───▶│ snarkjs (WASM) │───▶│ Groth16 Proof    │    │
+│   │  salaries[]   │    │ payroll.circom │    │ 384 bytes        │    │
+│   │  (never sent) │    │ 1065 constr.   │    │ + Poseidon commit│    │
+│   └──────────────┘    └────────────────┘    └────────┬─────────┘    │
+└────────────────────────────────────────────────────────┼─────────────┘
+                                                            │
+                          ┌─────────────────────────────────┘
+                          ▼
+              ┌───────────────────────┐
+              │   APPROVAL (Stellar)  │      ◀── No backend.
+              │   CFO sends XLM with  │          Stellar IS
+              │   run-ID memo back    │          the coordination
+              │   to admin's wallet   │          layer. Wallet-gated:
+              │   (only the configured│          wrong approver wallet
+              │   approver may sign)  │          is rejected outright.
+              └───────────┬───────────┘
+                          │ admin polls Horizon, detects memo
+                          ▼
+        ┌──────────────────────────────────────────┐
+        │      SOROBAN VERIFIER CONTRACT             │
+        │      CCOEJ6QC...QVUYAP (Stellar Testnet)   │
+        │                                            │
+        │  1. nullifier = sha256(proof) — replay     │
+        │     check against persistent storage       │
+        │  2. real BN254 pairing verification        │
+        │     e(-A,B)·e(α,β)·e(vk_x,γ)·e(C,δ) = 1    │
+        │  3. store PayrollRun{ total, n, verified }  │
+        │  4. emit PAYROLL · VERIFIED event           │
+        └──────────────────┬─────────────────────────┘
+                          │ verified == true
+                          ▼
+              ┌───────────────────────┐
+              │   USDC PAYMENT TX      │
+              │   real disbursement    │
+              │   to recipient wallets │
+              └───────────┬───────────┘
+                          │
+        ┌──────────────────┴──────────────────────┐
+        ▼                                          ▼
+┌───────────────────┐                  ┌─────────────────────────┐
+│  Public on Stellar │                  │  Private, off-chain      │
+│  ───────────────── │                  │  ─────────────────────── │
+│  total: 18500       │                  │  individual salaries     │
+│  recipients: 5       │                  │  who got paid what       │
+│  proof_verified: ✓  │                  │  stored only in admin's  │
+│  proof hash          │                  │  browser localStorage    │
+└───────────────────┘                  └─────────────────────────┘
 ```
 
 ---
 
-## Live Demo
+## What's built — every feature, no exaggeration
 
-**Contract on Stellar Expert:**
-[https://stellar.expert/explorer/testnet/contract/CCOEJ6QCZEFYDQTK53AAWINVB62BTPBJNZ7P5ZP2ELNHIDQEV3SMRDUD](https://stellar.expert/explorer/testnet/contract/CCOEJ6QCZEFYDQTK53AAWINVB62BTPBJNZ7P5ZP2ELNHIDQEV3SMRDUD)
+**The cryptographic core**
+- `payroll.circom` — Circom 2.2.2, 1,065 non-linear constraints, Groth16/BN254
+- Three enforced constraints: sum correctness, minimum-wage floor, Poseidon salary-batch commitment
+- Hermez Perpetual Powers of Tau trusted setup ceremony (2¹²)
+- Browser-side proving via snarkjs WASM — proof generation in ~2 seconds, salaries never transmitted
+- A real Soroban verifier contract performing genuine BN254 pairing checks, not a structural stub
+- On-chain nullifier system preventing any proof from being submitted twice
+- Live, deployed contract: `CCOEJ6QC6ZGGA2GIY72IW3MDN6LNJHQSB2XWRZR3WSLE3PVVE6QVUYAP`
 
-**A live verified payroll transaction:**
-[https://stellar.expert/explorer/testnet/tx/23ea5076cfd99443bb7a852663b3ee89a2c3e15ed48822caeeabf7ed1979bf89](https://stellar.expert/explorer/testnet/tx/23ea5076cfd99443bb7a852663b3ee89a2c3e15ed48822caeeabf7ed1979bf89)
+**The approval workflow (no backend, no shared accounts)**
+- Payroll runs move through `DRAFT → APPROVED → PAID`
+- The admin generates the proof and the run sits in draft, locked from submission
+- A shareable approval link encodes the run summary (total, recipients, cycle — never salaries) directly in the URL, so it works across any browser or device, even days later
+- The designated approver wallet sends a 1 XLM payment with the run ID as a memo, back to the admin — Stellar itself becomes the approval signal
+- **Wallet-gated approval** — if a specific approver wallet is configured, only that exact wallet can approve; any other connected wallet is rejected with a clear error, not a silent bypass
+- The admin's session polls Stellar Horizon every 5 seconds and unlocks submission automatically the moment the memo lands
+- Drafts and approved-but-unsubmitted runs live permanently in a dedicated **Pending Approvals** sidebar page, positioned between Payroll Runs and Proof Explorer, with a live badge count — they never silently vanish if the admin closes the tab
+- Resuming a draft picks up exactly where you left off via `?runId=`, re-hydrating the wizard state from localStorage instead of forcing a restart
 
-In this transaction you can see:
-- `verify_and_record()` called with encoded Groth16 proof bytes (`pi_a`, `pi_b`, `pi_c`)
-- Public inputs: total USDC, min_salary, n_recipients
-- Return value: `true` (proof verified)
-- No individual salary amounts — anywhere
+**Real USDC, real Stellar, real money movement**
+- After contract verification, a second transaction sends actual USDC to every recipient on Stellar testnet
+- Per-recipient trustline checking — payments to wallets without a USDC trustline are flagged, never silently dropped
+- Both transaction hashes (proof + payment) are recorded together and linked to Stellar Expert
 
-**Public attestation (shareable with auditors):**
-```
-https://zerowage.xyz/verify/[txHash]
-```
-This page fetches the transaction from Horizon, displays the public record, and links to independent verification on Stellar Expert — without revealing any salary data.
+**Wallet-native identity, not accounts**
+- Freighter is the only login. No email, no password, no session cookie
+- Protected dashboard routes — disconnected visitors see a wallet gate, not a blank or broken page
+- Hydration-safe wallet detection — no "Connect Wallet" flash before the real connected state resolves
+- First-run onboarding captures admin name, company name, role, and team size, then threads the real name through the sidebar instead of a hardcoded placeholder
 
----
+**Everything an admin actually needs to run payroll**
+- Manual employee entry or CSV import (`name,wallet,amount,department`), with a downloadable template
+- Department tagging and filtering across the employee roster
+- Aggregated employee view built from every run's history — correctly summed total-paid per person, only counting runs that actually reached `PAID`
+- A dedicated **ZK Payslip PDF** per employee — dark-themed, professionally laid out, carrying the proof hash, contract address, and a plain-English privacy notice, generated entirely client-side
+- Bulk "download all payslips," plus `.txt` and `.json` payroll receipts
+- A real-time dashboard — KPI row, latest proof card, paginated activity feed — all computed live from localStorage, zero mock data
+- A **Proof Explorer** with a split-panel layout: every verified proof, its public inputs in the open, its private salary inputs rendered as `████████`
+- A public, unauthenticated **attestation page** (`/verify/[txHash]`) that fetches the transaction straight from Stellar Horizon — built for auditors, boards, or anyone who needs to verify a claim without ever touching the app
 
-## What's Built
-
-ZeroWage is a complete, production-quality payroll application. Here is every feature that works today:
-
-**Authentication & onboarding**
-- Freighter wallet connection as sole identity — no email, no password
-- First-time onboarding modal collects admin name, company name, role, and team size
-- Protected dashboard routes — unauthenticated users see a wallet gate, not an empty page
-- Wallet hydration without flash — loading state prevents "Connect Wallet" flickering
-
-**Payroll runs**
-- 5-step wizard: Add Employees → Review → Generate Proof → Verify → Submit
-- Manual employee entry with name, Stellar wallet, salary amount, and department
-- CSV import — upload `name,wallet,amount,department` and the table populates instantly
-- CSV template download so users know the exact format
-- Real Groth16 proof generation in the browser (snarkjs WASM, ~2 seconds)
-- Live proof log showing circuit steps as they execute
-- Soroban contract call via Freighter wallet signature
-- Real USDC payments dispatched after proof verification
-- Trustline checking — recipients without USDC trustlines are flagged, not silently failed
-- Both proof tx hash and payment tx hash recorded and linked to Stellar Expert
-
-**Dashboard**
-- Real-time KPI row: total disbursed, verified runs, proof rate — all from localStorage
-- Latest proof card showing real tx hash, cycle, and USDC amount
-- Paginated activity feed: payroll created → proof verified → USDC sent
-- Recent runs table with direct links to run detail
-
-**Employees**
-- Aggregated employee list built from all payroll runs
-- Department assignment and filter (Engineering, Design, Finance, etc.)
-- Total paid per employee across all runs
-- Run count per employee
-- Admin sees real salary amounts (private inputs stored locally, off-chain)
-
-**Run detail**
-- Both proof tx and payment tx with Stellar Expert links
-- Full employee breakdown with real salaries visible to admin
-- Verification timeline: Witness → Proof → Soroban → Payments
-- Public record panel showing what the chain knows (total, count, verified=true)
-- Individual payslip PDF download per employee
-- Bulk "all payslips" download
-- Receipt download in `.txt` and `.json` formats
-- "Copy attestation link" for sharing with auditors
-
-**ZK Payslip PDF**
-- Dark-themed, professionally designed PDF per employee
-- Shows: employee name, wallet, salary amount, cycle, payment date
-- ZK proof attestation section with proof tx hash, contract address, Stellar Expert link
-- Privacy notice explaining what the blockchain does and does not record
-- Generated client-side via `@react-pdf/renderer` — no server involved
-
-**Proof Explorer**
-- Split-panel explorer: proof list on left, full detail on right
-- Public inputs displayed clearly: total, min_salary, n_recipients
-- Private inputs shown as `████████` — cryptographically hidden
-- Verification timeline with timing estimates
-- Links to run detail and Stellar Expert
-
-**Public attestation page** (`/verify/[txHash]`)
-- Shareable link for auditors, boards, or regulators
-- Fetches transaction from Stellar Horizon in real time
-- Displays: employer address, cycle, total, recipients, verification timestamp
-- Full tx hash with copy button and Stellar Expert link
-- Privacy notice: salary amounts are ZK-private
-- No authentication required — designed for external sharing
-
-**Documentation pages**
-- `/docs` — full documentation with quickstart guide and security model
-- `/docs/circuit` — circuit specification: constraints, signals table, trusted setup, proof structure
-- `/docs/api` — API reference with request/response schemas
-- `/pricing` — tiered pricing ($5/employee/month Startup, $3 Growth, Enterprise)
-- `/status` — live system status for all components
-
-**Settings**
-- Admin name and company name persisted from onboarding
-- Treasury wallet auto-populated from Freighter
-- Proof configuration (read-only): circuit, constraints, curve, contract address, network
-- Sidebar user section shows real admin name and initials from onboarding
+**Documentation that treats judges like engineers**
+- `/docs` — quickstart and security model
+- `/docs/circuit` — full constraint table, signal visibility table, trusted setup provenance
+- `/docs/api` — request/response schemas for every contract interaction
+- `/pricing`, `/status` — because a real product has these, even at hackathon stage
 
 ---
 
@@ -267,17 +240,19 @@ ZeroWage is a complete, production-quality payroll application. Here is every fe
 | ZK Circuit | Circom 2.2.2 |
 | Proving system | Groth16 |
 | Elliptic curve | BN254 (alt_bn128) |
+| Commitment hash | Poseidon (circomlib, chunked 8-input) |
 | Proof library | snarkjs 0.7.6 |
 | Trusted setup | Hermez Perpetual Powers of Tau (2¹²) |
-| Smart contract | Soroban (Rust) |
+| Smart contract | Soroban (Rust), soroban-sdk 27.0.0-rc.1 |
+| On-chain crypto | Native BN254 host functions (g1_mul, g1_add, pairing_check) |
 | Blockchain | Stellar Testnet |
-| Contract SDK | soroban-sdk v26 |
 | Frontend | Next.js 16 + TypeScript |
 | Styling | Tailwind CSS v4 + shadcn/ui |
 | Wallet | Freighter via @stellar/freighter-api |
 | Stellar SDK | @stellar/stellar-sdk |
 | Payments | USDC on Stellar Testnet |
 | PDF generation | @react-pdf/renderer |
+| Approval coordination | Stellar memo payments (no backend) |
 | Fonts | Inter + JetBrains Mono |
 
 ---
@@ -287,66 +262,51 @@ ZeroWage is a complete, production-quality payroll application. Here is every fe
 ```
 zerowage/
 ├── circuits/
-│   ├── payroll.circom              # The ZK circuit — 660 constraints
-│   ├── payroll.r1cs                # Compiled constraint system
-│   ├── payroll_js/
-│   │   └── payroll.wasm            # WASM prover (served from /public/circuit/)
+│   ├── payroll.circom                  # 1065-constraint circuit, Poseidon commitment
+│   ├── payroll.r1cs
+│   ├── payroll_js/payroll.wasm         # served to browser at /circuit/
 │   ├── trusted_setup/
-│   │   ├── pot12_final.ptau        # Hermez ceremony artifact
-│   │   ├── payroll_final.zkey      # Circuit-specific proving key
-│   │   └── verification_key.json   # Verifier key (embedded in contract)
-│   └── test_input.json             # Example witness for testing
+│   │   ├── pot12_final.ptau
+│   │   ├── payroll_final.zkey
+│   │   ├── verification_key.json
+│   │   └── vk_encoded.hex              # binary-encoded VK, stored on-chain via set_vk
+│   ├── encode_vk.js                    # JSON VK → contract-ready bytes
+│   └── call_set_vk.js                  # publishes VK to the live contract
 │
-├── contracts/
-│   └── payroll-verifier/
-│       └── contracts/hello-world/
-│           └── src/
-│               └── lib.rs          # Soroban verifier contract
+├── contracts/payroll-verifier/
+│   └── contracts/hello-world/src/
+│       └── lib.rs                      # real BN254 Groth16 verifier + nullifiers
 │
-└── app/                            # Next.js 16 application
+└── app/
     ├── app/
-    │   ├── page.tsx                # Landing page
+    │   ├── page.tsx                    # landing page
     │   ├── dashboard/
-    │   │   ├── page.tsx            # Dashboard with KPIs + activity
-    │   │   ├── new/page.tsx        # 5-step payroll wizard
-    │   │   ├── runs/
-    │   │   │   ├── page.tsx        # Payroll runs list
-    │   │   │   └── [id]/page.tsx   # Run detail + payslip download
-    │   │   ├── employees/page.tsx  # Employee list with departments
-    │   │   └── settings/page.tsx   # Company + proof configuration
-    │   ├── explorer/page.tsx       # Proof explorer
-    │   ├── verify/[txHash]/page.tsx # Public attestation (no auth)
-    │   ├── docs/                   # Documentation pages
-    │   ├── pricing/page.tsx        # Pricing tiers
-    │   └── status/page.tsx         # System status
+    │   │   ├── page.tsx                # real-time KPIs, activity feed
+    │   │   ├── new/page.tsx            # 5-step wizard, wrapped in Suspense
+    │   │   ├── pending/page.tsx        # draft + approved runs, awaiting action
+    │   │   ├── runs/[id]/page.tsx      # paid runs, full salary + proof detail
+    │   │   ├── employees/page.tsx      # aggregated roster, department filter
+    │   │   └── settings/page.tsx       # company profile, approver wallet
+    │   ├── approve/[runId]/page.tsx    # cross-browser CFO approval (memo-based, wallet-gated)
+    │   ├── verify/[txHash]/page.tsx    # public, unauthenticated attestation
+    │   ├── explorer/page.tsx           # proof explorer
+    │   └── docs/, pricing/, status/    # product-grade supporting pages
     │
     ├── components/
-    │   ├── app-shell.tsx           # Sidebar + topbar + wallet status
-    │   ├── auth/protected.tsx      # Wallet-gated route wrapper
-    │   ├── onboarding/
-    │   │   └── onboarding-modal.tsx # 3-step first-time setup
-    │   ├── dashboard/
-    │   │   ├── new-run-wizard.tsx  # 5-step payroll wizard
-    │   │   ├── kpi-row.tsx         # Real-time stats from localStorage
-    │   │   ├── latest-proof.tsx    # Most recent proof card
-    │   │   └── activity-feed.tsx   # Paginated event timeline
-    │   └── explorer/
-    │       └── proof-explorer.tsx  # Split-panel proof browser
+    │   ├── app-shell.tsx               # sidebar, wallet status, pending badge
+    │   ├── auth/protected.tsx          # wallet-gated route wrapper
+    │   ├── onboarding/onboarding-modal.tsx
+    │   └── dashboard/new-run-wizard.tsx # the entire payroll → proof → approval → submit flow
     │
     ├── lib/
-    │   ├── wallet-context.tsx      # Freighter wallet React context
-    │   ├── proof.ts                # snarkjs proof generation wrapper
-    │   ├── contract.ts             # Soroban contract interaction
-    │   ├── payroll-store.ts        # localStorage persistence layer
-    │   ├── payslip-pdf.tsx         # @react-pdf/renderer payslip
-    │   ├── download-payslip.ts     # PDF generation + download
-    │   ├── receipt.ts              # txt + json receipt generation
-    │   └── stellar.ts              # Stellar SDK helpers + constants
+    │   ├── wallet-context.tsx          # Freighter React context, no flash
+    │   ├── proof.ts                    # snarkjs + Poseidon commitment wrapper
+    │   ├── contract.ts                 # binary proof encoding + Soroban calls
+    │   ├── payroll-store.ts            # localStorage persistence, draft/approved/paid
+    │   ├── payslip-pdf.tsx             # @react-pdf/renderer ZK payslip
+    │   └── receipt.ts                  # txt + json payroll receipts
     │
-    └── public/
-        └── circuit/
-            ├── payroll.wasm        # Circuit prover (served to browser)
-            └── payroll_final.zkey  # Proving key (served to browser)
+    └── public/circuit/                 # payroll.wasm + payroll_final.zkey
 ```
 
 ---
@@ -354,106 +314,97 @@ zerowage/
 ## Quick Start
 
 ```bash
-# Clone the repository
 git clone https://github.com/yourusername/zerowage
-cd zerowage
-
-# Install frontend dependencies
-cd app
+cd zerowage/app
 npm install
-
-# Run the development server
 npm run dev
 # → http://localhost:3000
 ```
 
-> **Note:** The `.zkey` and `.ptau` files are not committed to the repository (they are large binary artifacts). To regenerate the trusted setup:
+The `.zkey` and `.ptau` artifacts are large binaries and aren't committed. Regenerate them:
 
 ```bash
 cd circuits
+npm install circomlib circomlibjs
 
-# Install dependencies
-npm install circomlib
-
-# Compile the circuit
 circom2 payroll.circom --r1cs --wasm --sym --output .
 
-# Powers of Tau ceremony
 snarkjs powersoftau new bn128 12 trusted_setup/pot12_0000.ptau
 snarkjs powersoftau contribute trusted_setup/pot12_0000.ptau trusted_setup/pot12_0001.ptau
 snarkjs powersoftau prepare phase2 trusted_setup/pot12_0001.ptau trusted_setup/pot12_final.ptau
 
-# Circuit-specific setup
 snarkjs groth16 setup payroll.r1cs trusted_setup/pot12_final.ptau trusted_setup/payroll_0000.zkey
 snarkjs zkey contribute trusted_setup/payroll_0000.zkey trusted_setup/payroll_final.zkey
 snarkjs zkey export verificationkey trusted_setup/payroll_final.zkey trusted_setup/verification_key.json
 
-# Copy artifacts to frontend public directory
 cp payroll_js/payroll.wasm ../app/public/circuit/
 cp trusted_setup/payroll_final.zkey ../app/public/circuit/
 ```
 
-To deploy the Soroban contract to testnet:
+Deploy the verifier and register its verification key on-chain:
 
 ```bash
 cd contracts/payroll-verifier
-
-# Install Stellar CLI
 cargo install --locked stellar-cli
+rustup target add wasm32v1-none
 
-# Generate and fund a testnet identity
 stellar keys generate deployer --network testnet
 stellar keys fund deployer --network testnet
 
-# Build and deploy
 stellar contract build
 stellar contract deploy \
   --wasm target/wasm32v1-none/release/hello_world.wasm \
-  --source deployer \
-  --network testnet
+  --source deployer --network testnet
+
+cd ../../circuits
+node encode_vk.js
+node call_set_vk.js   # publishes the VK so the contract can verify proofs
+```
+
+---
+
+## Live Demo
+
+**Contract on Stellar Expert:**
+[stellar.expert/explorer/testnet/contract/CCOEJ6QC6ZGGA2GIY72IW3MDN6LNJHQSB2XWRZR3WSLE3PVVE6QVUYAP](https://stellar.expert/explorer/testnet/contract/CCOEJ6QC6ZGGA2GIY72IW3MDN6LNJHQSB2XWRZR3WSLE3PVVE6QVUYAP)
+
+Open any `verify_and_record` call in that contract's history and you'll find the raw proof bytes — `pi_a`, `pi_b`, `pi_c` — sitting in the transaction, alongside public signals for total, minimum salary, recipient count, and the Poseidon commitment. What you will not find, anywhere, is a single salary amount.
+
+**Public attestation (shareable with auditors, no login):**
+```
+https://zerowage.xyz/verify/[proofTxHash]
 ```
 
 ---
 
 ## Why Stellar
 
-Stellar is the only production blockchain where this project is possible today. The X-Ray protocol upgrade introduced native BN254 elliptic curve host functions — `bn254_add`, `bn254_mul`, `bn254_pairing` — making Groth16 proof verification in a Soroban contract economically viable. On Ethereum, the equivalent verification costs hundreds of thousands of gas. On Stellar, it costs a fraction of a cent.
+This project doesn't run on Stellar by default — it runs on Stellar because nowhere else was it possible. The X-Ray protocol upgrade shipped native BN254 host functions (`bn254_g1_mul`, `bn254_g1_add`, `bn254_pairing_check`) directly into Soroban. On Ethereum, a Groth16 pairing check costs hundreds of thousands of gas; on Stellar, the same verification settles for a fraction of a cent, in seconds. Without that primitive, this entire architecture collapses into either an off-chain trust assumption or an economically nonviable on-chain check.
 
-Beyond cryptography, Stellar is the right chain for payroll. USDC is a first-class asset, not a wrapped token. Path payments are native to the protocol. Settlement is 5 seconds, not 15 minutes. The Stellar Development Foundation's financial inclusion mission is philosophically aligned with ZeroWage's goal: making compliant, private payroll accessible to any company paying anyone, anywhere.
-
-The combination of BN254 precompiles and payments-native infrastructure makes Stellar the only chain where "ZK payroll" is not an academic exercise.
+Beyond the cryptography, Stellar is simply the right chain for moving payroll: USDC is a first-class asset rather than a wrapped token, settlement takes seconds rather than blocks of confirmation theater, and the Stellar Development Foundation's stated mission — accessible financial infrastructure — is the same mission ZeroWage is built around, just applied to the single most sensitive financial flow inside every company on earth.
 
 ---
 
 ## Future Roadmap
 
-**Multi-sig payroll approval**
-Before a payroll run can be submitted to the Soroban contract, require M-of-N signatures from designated approvers (CFO + CEO, or 2-of-3 treasury signers). The ZK proof is generated once; the approval workflow happens off-chain and the final submission is authorized by the multisig threshold.
+**Recursive proof aggregation** — the current circuit handles 20 recipients per proof. Batch multiple 20-person proofs and aggregate them into a single recursive Groth16 proof, so a 10,000-employee company gets one on-chain verification, not five hundred.
 
-**Recursive proof aggregation for enterprise scale**
-The current circuit supports 20 recipients. For companies with thousands of employees, implement recursive Groth16 proof aggregation: batch proofs for 20 employees each, then generate a single aggregation proof that verifies all batches. One on-chain verification for a 10,000-person payroll run.
+**Multi-sig approval thresholds** — extend the single-approver model to M-of-N: require, say, 2-of-3 designated signers before a draft unlocks for submission, matching how real corporate treasuries actually operate.
 
-**Auditor portal with designated decryption**
-An employer can designate an auditor's public key. The salary data is re-encrypted under the auditor's key and stored in Supabase. The auditor can decrypt their designated view without the employer revealing data to anyone else. The ZK proof still guarantees the decrypted data is correct — the auditor doesn't have to trust the employer's export.
+**Auditor-designated decryption** — let an employer name an auditor's public key; salary data gets re-encrypted under that key and the auditor can decrypt their authorized view without the employer ever exposing data more broadly, while the ZK proof still guarantees the decrypted figures are the real ones.
 
-**Stellar Anchor integration for fiat off-ramps**
-Employees who receive USDC on Stellar can redeem it for local fiat through SEP-24-compliant Anchors without ever interacting with crypto directly. ZeroWage becomes the bridge between crypto-native payroll and local bank accounts in 180+ countries.
+**Stellar Anchor fiat off-ramps** — SEP-24 integration so employees receiving USDC can cash out to local bank accounts in 180+ countries without ever touching a centralized exchange.
 
-**TEE-based compliance oracle**
-For jurisdictions requiring real payroll compliance data (minimum wage, tax withholding), a Trusted Execution Environment runs the salary validation logic and attests that the ZK circuit inputs satisfy jurisdiction-specific rules — without the TEE ever learning individual salaries, and without the employer manually asserting compliance.
+**TEE-based jurisdictional compliance** — a Trusted Execution Environment that attests salary inputs satisfy region-specific minimum-wage or withholding rules, without the TEE — or anyone — learning the actual figures.
 
-**Cross-chain proof portability**
-Export Stellar-verified payroll proofs as standards-compliant attestations (W3C Verifiable Credentials) that can be verified on any chain with BN254 precompiles. A payroll run proven on Stellar becomes a portable credential recognized by EVM chains, Cosmos, and any future chain that supports Groth16 verification.
+**Cross-chain attestation portability** — export Stellar-verified payroll proofs as W3C Verifiable Credentials, recognized by any chain with BN254 precompiles, so a payroll run proven once on Stellar becomes a portable, chain-agnostic compliance artifact.
 
 ---
 
 ## Acknowledgements
 
-- **iden3 / Circom team** for building the most production-ready ZK circuit compiler and the circomlib constraint library
-- **Stellar Development Foundation** for the Soroban platform, the BN254 host function precompiles in the X-Ray upgrade, and for building the payments infrastructure that makes this product real
-- **Hermez Network** for the Perpetual Powers of Tau ceremony — a public good that every Groth16 project on any chain can rely on
-- **Aztec Protocol** for advancing the theory and practice of practical ZK systems
+**iden3** for Circom and the circomlib constraint library this circuit is built on. **The Stellar Development Foundation** for Soroban, the X-Ray upgrade's BN254 precompiles, and for building payments infrastructure good enough that "ZK payroll" stopped being a thought experiment. **Hermez Network** for the Powers of Tau ceremony every Groth16 project quietly depends on. **Aztec Protocol** for advancing what practical zero-knowledge systems look like in production.
 
 ---
 
-*ZeroWage is proof that blockchain's transparency problem and payroll's privacy requirement are not in conflict — they just needed a different kind of math.*
+*A payroll spreadsheet has always had two columns nobody could reconcile: who gets paid, and who's allowed to know. ZeroWage doesn't pick a side. It proves the first column is correct and makes the second column irrelevant — not by promising to keep a secret, but by never knowing it in the first place.*

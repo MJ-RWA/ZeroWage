@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useParams } from 'next/navigation'
+import { useParams, useSearchParams } from 'next/navigation'
 import {
   Shield,
   CheckCircle,
@@ -14,29 +14,67 @@ import Link from 'next/link'
 import { getPayrollRunById, updateRunStatus } from '@/lib/payroll-store'
 import { Button } from '@/components/ui/button'
 
-export default function ApprovePage() {
-  const params = useParams()
-  const runId = params.runId as string
+// Shape of the encoded payload in ?data=
+interface ApprovalPayload {
+  id: string
+  cycleId: string
+  total: number
+  recipients: number
+  date: string
+  adminWallet: string
+}
 
-  const [run, setRun] = useState<any>(null)
-  const [notFound, setNotFound] = useState(false)
+export default function ApprovePage() {
+  const params       = useParams()
+  const searchParams = useSearchParams()
+  const runId        = params.runId as string
+
+  const [run, setRun]             = useState<any>(null)
+  const [notFound, setNotFound]   = useState(false)
   const [approving, setApproving] = useState(false)
-  const [approved, setApproved] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const [approved, setApproved]   = useState(false)
+  const [error, setError]         = useState<string | null>(null)
   const [walletAddress, setWalletAddress] = useState<string | null>(null)
 
   useEffect(() => {
-    const found = getPayrollRunById(runId)
-    if (found) {
-      setRun(found)
-      if (found.status === 'approved' || found.status === 'paid') {
+    // 1️⃣ Try localStorage first (same-browser flow)
+    const stored = getPayrollRunById(runId)
+    if (stored) {
+      setRun(stored)
+      if (stored.status === 'approved' || stored.status === 'paid') {
         setApproved(true)
       }
-    } else {
-      setNotFound(true)
+      return
     }
 
-    // Check wallet
+    // 2️⃣ Fall back to ?data= URL param (cross-device / CFO flow)
+    const encoded = searchParams.get('data')
+    if (encoded) {
+      try {
+        const payload: ApprovalPayload = JSON.parse(atob(encoded))
+        // Validate the runId in the URL matches the payload
+        if (payload.id === runId) {
+          setRun({
+            id:          payload.id,
+            cycleId:     payload.cycleId,
+            total:       payload.total,
+            recipients:  payload.recipients,
+            date:        payload.date,
+            adminWallet: payload.adminWallet,
+            status:      'draft',
+          })
+          return
+        }
+      } catch {
+        // malformed base64 — fall through to notFound
+      }
+    }
+
+    setNotFound(true)
+  }, [runId, searchParams])
+
+  // Check if Freighter is already connected
+  useEffect(() => {
     async function checkWallet() {
       try {
         const { isConnected, getAddress } = await import('@stellar/freighter-api')
@@ -48,7 +86,7 @@ export default function ApprovePage() {
       } catch {}
     }
     checkWallet()
-  }, [runId])
+  }, [])
 
   async function connectWallet() {
     try {
@@ -62,53 +100,73 @@ export default function ApprovePage() {
   }
 
   async function handleApprove() {
-    if (!walletAddress) {
-      await connectWallet()
-      return
-    }
+  if (!walletAddress) {
+    await connectWallet()
+    return
+  }
 
+  // Guard: if the run specifies an approver wallet, only that wallet can approve
+  const expectedApprover = (run as any).approverWallet
+  if (expectedApprover && walletAddress !== expectedApprover) {
+    setError(
+      `This run requires approval from ${expectedApprover.slice(0, 8)}...${expectedApprover.slice(-6)}. You are connected as ${walletAddress.slice(0, 8)}...${walletAddress.slice(-6)}.`
+    )
+    return
+  }
     setApproving(true)
     setError(null)
 
     try {
-      // Sign approval message with Freighter
-      const { signMessage } = await import('@stellar/freighter-api')
+      const { signTransaction } = await import('@stellar/freighter-api')
+      const {
+        TransactionBuilder,
+        Networks,
+        BASE_FEE,
+        Operation,
+        Asset,
+        Memo,
+        Horizon,
+      } = await import('@stellar/stellar-sdk')
 
-      const message = [
-        'ZeroWage Payroll Approval',
-        `Run ID: ${runId}`,
-        `Cycle: ${run.cycleId}`,
-        `Total: ${run.total} USDC`,
-        `Recipients: ${run.recipients}`,
-        `Approved by: ${walletAddress}`,
-        `Timestamp: ${new Date().toISOString()}`,
-        '',
-        'I confirm I have reviewed the payroll summary above.',
-        'Individual salary amounts are ZK-private and not visible to me.',
-        'I authorize submission of this payroll run to Stellar.',
-      ].join('\n')
+      const horizon = new Horizon.Server('https://horizon-testnet.stellar.org')
+      const account = await horizon.loadAccount(walletAddress)
 
-let signature = 'approved'
-       try {
-         const result = await signMessage(message, {
-           networkPassphrase: 'Test SDF Network ; September 2015',
-         })
-         if (result && 'signedMessage' in result && result.signedMessage) {
-           signature = typeof result.signedMessage === 'string'
-             ? result.signedMessage
-             : result.signedMessage.toString('utf-8')
-         }
-      } catch {
-        // signMessage may not be available in all Freighter versions
-        // Fall back to address-only approval
-        signature = `approved-by-${walletAddress}-at-${Date.now()}`
-      }
-
-      updateRunStatus(runId, 'approved', {
-        approvalSignature: signature,
-        approvedAt: new Date().toUTCString(),
-        approverWallet: walletAddress,
+      // Send 1 XLM to admin wallet with memo = runId (approval signal)
+      const tx = new TransactionBuilder(account, {
+        fee: BASE_FEE,
+        networkPassphrase: Networks.TESTNET,
       })
+        .addOperation(
+          Operation.payment({
+            destination: run!.adminWallet,
+            asset:       Asset.native(),
+            amount:      '1',
+          })
+        )
+        .addMemo(Memo.text(run!.id.slice(0, 28))) // Stellar memo max 28 bytes
+        .setTimeout(300)
+        .build()
+
+      const signResult = await signTransaction(tx.toXDR(), {
+        networkPassphrase: Networks.TESTNET,
+      })
+
+      const signed = TransactionBuilder.fromXDR(
+        signResult.signedTxXdr,
+        Networks.TESTNET
+      )
+
+      await horizon.submitTransaction(signed as any)
+
+      // If the run exists in localStorage (same-browser), update it there too
+      const stored = getPayrollRunById(run!.id)
+      if (stored) {
+        updateRunStatus(run!.id, 'approved', {
+          approvedAt:        new Date().toUTCString(),
+          approverWallet:    walletAddress,
+          approvalSignature: 'stellar-memo',
+        })
+      }
 
       setApproved(true)
     } catch (e: any) {
@@ -117,6 +175,8 @@ let signature = 'approved'
       setApproving(false)
     }
   }
+
+  // ── Loading / error states ─────────────────────────────────────────────────
 
   if (notFound) {
     return (
@@ -140,6 +200,8 @@ let signature = 'approved'
     )
   }
 
+  // ── Main render ────────────────────────────────────────────────────────────
+
   return (
     <div className="min-h-screen bg-background flex flex-col items-center justify-center px-4 py-16">
       {/* Brand */}
@@ -152,7 +214,7 @@ let signature = 'approved'
 
       <div className="w-full max-w-md">
         {approved ? (
-          /* Approved state */
+          /* ── Approved state ── */
           <div className="rounded-2xl border border-success/20 bg-success/5 overflow-hidden">
             <div className="px-6 py-5 border-b border-success/20 flex items-center gap-3">
               <CheckCircle size={20} className="text-success" />
@@ -166,21 +228,24 @@ let signature = 'approved'
               </div>
             </div>
             <div className="px-6 py-5 space-y-3 font-mono text-sm">
-              <Row label="Cycle" value={run.cycleId} />
-              <Row label="Total" value={`${run.total.toLocaleString()} USDC`} highlight />
+              <Row label="Cycle"      value={run.cycleId} />
+              <Row label="Total"      value={`${run.total.toLocaleString()} USDC`} highlight />
               <Row label="Recipients" value={String(run.recipients)} />
               {run.approvedAt && (
-                <Row label="Approved at" value={new Date(run.approvedAt).toLocaleString()} />
+                <Row
+                  label="Approved at"
+                  value={new Date(run.approvedAt).toLocaleString()}
+                />
               )}
             </div>
             <div className="px-6 py-4 bg-background/50 border-t border-success/20">
               <p className="text-xs text-muted-foreground">
-                You can close this window. The payroll admin has been notified.
+                You can close this window. The payroll admin has been notified via Stellar.
               </p>
             </div>
           </div>
         ) : (
-          /* Approval form */
+          /* ── Approval form ── */
           <div className="rounded-2xl border border-border bg-card overflow-hidden">
             {/* Header */}
             <div className="border-b border-border px-6 py-5">
@@ -204,15 +269,11 @@ let signature = 'approved'
               <div className="text-xs text-muted-foreground uppercase tracking-widest mb-3">
                 Payroll Summary
               </div>
-              <Row label="Cycle" value={run.cycleId} />
-              <Row
-                label="Total amount"
-                value={`${run.total.toLocaleString()} USDC`}
-                highlight
-              />
-              <Row label="Recipients" value={String(run.recipients)} />
-              <Row label="Submitted" value={new Date(run.date).toLocaleDateString()} />
-              <Row label="Status" value="AWAITING APPROVAL" />
+              <Row label="Cycle"        value={run.cycleId} />
+              <Row label="Total amount" value={`${run.total.toLocaleString()} USDC`} highlight />
+              <Row label="Recipients"   value={String(run.recipients)} />
+              <Row label="Submitted"    value={new Date(run.date).toLocaleDateString()} />
+              <Row label="Status"       value="AWAITING APPROVAL" />
             </div>
 
             {/* ZK privacy notice */}
@@ -262,7 +323,7 @@ let signature = 'approved'
                 {approving ? (
                   <>
                     <Loader2 size={16} className="animate-spin" />
-                    Signing approval...
+                    Signing approval on Stellar...
                   </>
                 ) : (
                   <>
@@ -272,7 +333,7 @@ let signature = 'approved'
                 )}
               </Button>
               <p className="mt-2 text-center text-xs text-muted-foreground">
-                Freighter will ask you to sign an approval message
+                Freighter will ask you to sign a 1 XLM transaction to the admin wallet
               </p>
             </div>
           </div>
