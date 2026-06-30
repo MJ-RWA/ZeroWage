@@ -52,9 +52,9 @@ hash.out === commitment;  // Poseidon(salaries[0..8])
 
 snarkjs compiles this into a Groth16 proof — three elliptic curve points, 384 bytes — in about two seconds, inside the browser tab, using WebAssembly. The salary array is discarded the instant the proof exists. There is nothing left to leak.
 
-**3. The proof goes to a CFO, not straight to the chain.** This is where ZeroWage stops looking like a hackathon demo and starts looking like a real company's controls. The admin can't unilaterally move money — a payroll run sits in `DRAFT` until a second wallet, the designated approver, reviews the aggregate (total, recipient count — never individual salaries) and signs off. The approval link works across browsers, across devices, across days, because it's anchored to Stellar itself: the CFO sends a tiny XLM payment back to the admin's wallet with the run ID encoded as a memo. The admin's session polls Horizon, finds that memo, and the run unlocks. No backend, no database — Stellar *is* the coordination layer. And the approval is wallet-gated: if a specific approver address is configured, only that exact wallet can sign off — anyone else gets turned away with a clear error, not a silent bypass.
+**3. The proof goes to a CFO, not straight to the chain.** The admin can't unilaterally move money — a payroll run sits in `DRAFT` until a second wallet, the designated approver, reviews the aggregate (total, recipient count — never individual salaries) and signs off. The approval link works across browsers, across devices, across days, because it's anchored to Stellar itself: the CFO sends a tiny XLM payment back to the admin's wallet with the run ID encoded as a memo. The admin's session polls Horizon, finds that memo, and the run unlocks. No backend, no database — Stellar *is* the coordination layer. And the approval is wallet-gated: if a specific approver address is configured, only that exact wallet can sign off — anyone else gets turned away with a clear error, not a silent bypass.
 
-**4. The contract verifies the actual math.** This is the part most "ZK on-chain" hackathon projects fake. ZeroWage doesn't. The Soroban contract performs real BN254 elliptic curve pairing operations — the literal Groth16 verification equation, evaluated on-chain:
+**4. The contract verifies the actual math.** The Soroban contract performs real BN254 elliptic curve pairing operations — the literal Groth16 verification equation, evaluated on-chain:
 
 ```
 e(-π_A, π_B) · e(α, β) · e(vk_x, γ) · e(π_C, δ) = 1
@@ -69,8 +69,6 @@ using Stellar's native `bn254_pairing_check`, `bn254_g1_mul`, and `bn254_g1_add`
 ---
 
 ## The verifier itself does the math
-
-It's worth being precise about what "real verification" means here, because it's the single most important technical fact about this project.
 
 A lot of "ZK on Soroban" demos store a proof's bytes on-chain and check that they're non-empty, or call out to an off-chain service that does the real verification and just writes the result on-chain as an attestation. That's not on-chain verification — that's on-chain *bookkeeping* of an off-chain decision. ZeroWage's contract does not do that.
 
