@@ -11,11 +11,13 @@ import {
   ExternalLink,
   Copy,
   Check,
+  FileText,
+  Share2,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { getPayrollRunById, type PayrollRun } from '@/lib/payroll-store'
-import { downloadPayslip, downloadAllPayslips } from '@/lib/download-payslip'
-import { FileText } from 'lucide-react'
+import { downloadAllPayslips } from '@/lib/download-payslip'
+import { toast } from 'sonner'
 
 function CopyBtn({ value }: { value: string }) {
   const [copied, setCopied] = useState(false)
@@ -114,33 +116,56 @@ export default function RunDetailPage() {
             {new Date(run.date).toUTCString()}
           </p>
         </div>
-        <div className="flex gap-2">
-          <Button
-            asChild
-            variant="outline"
-            className="gap-1.5 border-border bg-card hover:bg-accent"
-          >
-            <a
-              href={`https://stellar.expert/explorer/testnet/tx/${run.proofTxHash}`}
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              <ExternalLink className="size-4" />
-              Stellar Expert
-            </a>
-          </Button>
 
-           <Button
+        <div className="flex flex-wrap gap-2">
+          {/* Stellar Expert — only when proof tx exists */}
+          {run.proofTxHash && (
+            <Button
+              asChild
+              variant="outline"
+              className="gap-1.5 border-border bg-card hover:bg-accent"
+            >
+              <a
+                href={`https://stellar.expert/explorer/testnet/tx/${run.proofTxHash}`}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                <ExternalLink className="size-4" />
+                Stellar Expert
+              </a>
+            </Button>
+          )}
+
+          {/* Download all payslips */}
+          <Button
             variant="outline"
             className="gap-1.5 border-border bg-card hover:bg-accent"
             onClick={() => {
-            const name = JSON.parse(localStorage.getItem('zerowage_settings') || '{}').companyName
-            downloadAllPayslips(run, name)
+              const name = JSON.parse(
+                localStorage.getItem('zerowage_settings') || '{}'
+              ).companyName
+              downloadAllPayslips(run, name)
             }}
-           >
-           <FileText className="size-4" />
-           All payslips
-         </Button>
+          >
+            <FileText className="size-4" />
+            All payslips
+          </Button>
+
+          {/* Share attestation — only when proof tx exists */}
+          {run.proofTxHash && (
+            <Button
+              variant="outline"
+              className="gap-1.5 border-border bg-card hover:bg-accent"
+              onClick={async () => {
+                const url = `${window.location.origin}/verify/${run.proofTxHash}`
+                await navigator.clipboard.writeText(url)
+                toast.success('Attestation link copied')
+              }}
+            >
+              <Share2 className="size-4" />
+              Copy attestation link
+            </Button>
+          )}
         </div>
       </div>
 
@@ -178,9 +203,7 @@ export default function RunDetailPage() {
           {/* Proof metadata */}
           <section className="overflow-hidden rounded-xl border border-border bg-card">
             <div className="flex items-center justify-between border-b border-border px-5 py-3.5">
-              <h2 className="text-sm font-medium text-foreground">
-                ZK Proof
-              </h2>
+              <h2 className="text-sm font-medium text-foreground">ZK Proof</h2>
               <span className="inline-flex items-center gap-1.5 text-xs text-success">
                 <Shield size={11} />
                 Groth16 · BN254
@@ -190,17 +213,23 @@ export default function RunDetailPage() {
               <DetailRow label="Proof tx hash">
                 <div className="flex items-center gap-2">
                   <span className="text-primary">
-                    {run.proofTxHash.slice(0, 20)}...{run.proofTxHash.slice(-8)}
+                    {run.proofTxHash
+                      ? `${run.proofTxHash.slice(0, 20)}...${run.proofTxHash.slice(-8)}`
+                      : '—'}
                   </span>
-                  <CopyBtn value={run.proofTxHash} />
-                  <a
-                    href={`https://stellar.expert/explorer/testnet/tx/${run.proofTxHash}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-muted-foreground hover:text-primary transition-colors"
-                  >
-                    <ExternalLink size={11} />
-                  </a>
+                  {run.proofTxHash && (
+                    <>
+                      <CopyBtn value={run.proofTxHash} />
+                      <a
+                        href={`https://stellar.expert/explorer/testnet/tx/${run.proofTxHash}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-muted-foreground hover:text-primary transition-colors"
+                      >
+                        <ExternalLink size={11} />
+                      </a>
+                    </>
+                  )}
                 </div>
               </DetailRow>
               {run.paymentTxHash && (
@@ -225,9 +254,7 @@ export default function RunDetailPage() {
               <DetailRow label="Circuit">payroll.circom</DetailRow>
               <DetailRow label="Constraints">660</DetailRow>
               <DetailRow label="Network">Stellar Testnet</DetailRow>
-              <DetailRow label="Contract">
-                CCOEJ6QC...SMRDUD
-              </DetailRow>
+              <DetailRow label="Contract">CCOEJ6QC...SMRDUD</DetailRow>
             </div>
           </section>
 
@@ -247,12 +274,8 @@ export default function RunDetailPage() {
                   <tr className="border-b border-border text-xs text-muted-foreground">
                     <th className="px-5 py-2.5 font-medium">Name</th>
                     <th className="px-5 py-2.5 font-medium">Wallet</th>
-                    <th className="px-5 py-2.5 text-right font-medium">
-                      Amount
-                    </th>
-                    <th className="px-5 py-2.5 text-right font-medium">
-                      Status
-                    </th>
+                    <th className="px-5 py-2.5 text-right font-medium">Amount</th>
+                    <th className="px-5 py-2.5 text-right font-medium">Status</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -271,14 +294,20 @@ export default function RunDetailPage() {
                         {emp.amount.toLocaleString()} USDC
                       </td>
                       <td className="px-5 py-3.5 text-right">
-                         <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ring-1 ring-inset ${
-                          run.status === 'paid'
-                          ? 'bg-success/10 text-success ring-success/20'
-                          : run.status === 'approved'
-                          ? 'bg-blue-500/10 text-blue-400 ring-blue-500/20'
-                          : 'bg-yellow-500/10 text-yellow-400 ring-yellow-500/20'
-                          }`}>
-                          {run.status === 'paid' ? 'Paid' : run.status === 'approved' ? 'Pending' : 'Draft'}
+                        <span
+                          className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ring-1 ring-inset ${
+                            run.status === 'paid'
+                              ? 'bg-success/10 text-success ring-success/20'
+                              : run.status === 'approved'
+                              ? 'bg-blue-500/10 text-blue-400 ring-blue-500/20'
+                              : 'bg-yellow-500/10 text-yellow-400 ring-yellow-500/20'
+                          }`}
+                        >
+                          {run.status === 'paid'
+                            ? 'Paid'
+                            : run.status === 'approved'
+                            ? 'Pending'
+                            : 'Draft'}
                         </span>
                       </td>
                     </tr>
@@ -306,11 +335,11 @@ export default function RunDetailPage() {
             </div>
             <div className="p-5 space-y-4">
               {[
-                { label: 'Salaries entered', done: true },
-                { label: 'Witness computed', done: true },
-                { label: 'Groth16 proof generated', done: true },
+                { label: 'Salaries entered',         done: true },
+                { label: 'Witness computed',          done: true },
+                { label: 'Groth16 proof generated',  done: true },
                 { label: 'Soroban contract verified', done: true },
-                { label: 'USDC payments sent', done: !!run.paymentTxHash },
+                { label: 'USDC payments sent',        done: !!run.paymentTxHash },
               ].map((step) => (
                 <div key={step.label} className="flex items-center gap-3">
                   <span

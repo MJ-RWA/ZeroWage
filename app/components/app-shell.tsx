@@ -11,6 +11,7 @@ import {
   Plus,
   Search,
   ChevronsUpDown,
+  Clock,
 } from 'lucide-react'
 import { Logo } from '@/components/logo'
 import { Button } from '@/components/ui/button'
@@ -26,8 +27,6 @@ const nav = [
   { href: '/dashboard/employees', label: 'Employees', icon: Users },
   { href: '/dashboard/settings', label: 'Settings', icon: Settings },
 ]
-
-
 
 function SidebarUser() {
   const [name, setName] = useState('Admin')
@@ -68,6 +67,44 @@ function SidebarUser() {
   )
 }
 
+function NavWithBadge({ pathname }: { pathname: string }) {
+  const [draftCount, setDraftCount] = useState(0)
+  const active = pathname.startsWith('/dashboard/pending')
+
+  useEffect(() => {
+    const runs = JSON.parse(localStorage.getItem('zerowage_runs') || '[]')
+    const pending = runs.filter(
+      (r: any) => r.status === 'draft' || r.status === 'approved'
+    ).length
+    setDraftCount(pending)
+  }, [])
+
+  return (
+    <Link
+      href="/dashboard/pending"
+      className={cn(
+        'group flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors',
+        active
+          ? 'bg-accent text-foreground'
+          : 'text-muted-foreground hover:bg-accent/50 hover:text-foreground'
+      )}
+    >
+      <Clock
+        className={cn(
+          'size-4 shrink-0',
+          active ? 'text-primary' : 'text-muted-foreground'
+        )}
+      />
+      Pending Approvals
+      {draftCount > 0 && (
+        <span className="ml-auto flex size-5 items-center justify-center rounded-full bg-yellow-500/20 text-[10px] font-medium text-yellow-400">
+          {draftCount}
+        </span>
+      )}
+    </Link>
+  )
+}
+
 function NavLinks({ pathname }: { pathname: string }) {
   return (
     <nav className="flex flex-col gap-0.5">
@@ -77,24 +114,29 @@ function NavLinks({ pathname }: { pathname: string }) {
             ? pathname === '/dashboard'
             : pathname.startsWith(item.href)
         return (
-          <Link
-            key={item.href}
-            href={item.href}
-            className={cn(
-              'group flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors',
-              active
-                ? 'bg-accent text-foreground'
-                : 'text-muted-foreground hover:bg-accent/50 hover:text-foreground',
-            )}
-          >
-            <item.icon
+          <span key={item.href} className="contents">
+            <Link
+              href={item.href}
               className={cn(
-                'size-4 shrink-0',
-                active ? 'text-primary' : 'text-muted-foreground',
+                'group flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors',
+                active
+                  ? 'bg-accent text-foreground'
+                  : 'text-muted-foreground hover:bg-accent/50 hover:text-foreground',
               )}
-            />
-            {item.label}
-          </Link>
+            >
+              <item.icon
+                className={cn(
+                  'size-4 shrink-0',
+                  active ? 'text-primary' : 'text-muted-foreground',
+                )}
+              />
+              {item.label}
+            </Link>
+            {/* Pending Approvals sits right after Payroll Runs */}
+            {item.href === '/dashboard/runs' && (
+              <NavWithBadge pathname={pathname} />
+            )}
+          </span>
         )
       })}
     </nav>
@@ -136,9 +178,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               <div className="truncate text-sm font-medium text-foreground">
                 <SidebarUser />
               </div>
-              <div className="truncate text-xs text-muted-foreground">
-                Payroll Admin
-              </div>
             </div>
           </div>
         </div>
@@ -163,7 +202,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               </kbd>
             </div>
           </div>
-          
+
           <div className="flex items-center gap-3">
           <WalletButton />
           <Button asChild size="sm" className="gap-1.5">
@@ -184,18 +223,32 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 ? pathname === '/dashboard'
                 : pathname.startsWith(item.href)
             return (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={cn(
-                  'whitespace-nowrap rounded-md px-3 py-1.5 text-sm',
-                  active
-                    ? 'bg-accent text-foreground'
-                    : 'text-muted-foreground',
+              <span key={item.href} className="contents">
+                <Link
+                  href={item.href}
+                  className={cn(
+                    'whitespace-nowrap rounded-md px-3 py-1.5 text-sm',
+                    active
+                      ? 'bg-accent text-foreground'
+                      : 'text-muted-foreground',
+                  )}
+                >
+                  {item.label}
+                </Link>
+                {item.href === '/dashboard/runs' && (
+                  <Link
+                    href="/dashboard/pending"
+                    className={cn(
+                      'whitespace-nowrap rounded-md px-3 py-1.5 text-sm',
+                      pathname.startsWith('/dashboard/pending')
+                        ? 'bg-accent text-foreground'
+                        : 'text-muted-foreground',
+                    )}
+                  >
+                    Pending
+                  </Link>
                 )}
-              >
-                {item.label}
-              </Link>
+              </span>
             )
           })}
         </div>
