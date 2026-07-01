@@ -60,7 +60,7 @@ export function ProductPreview() {
               </Row>
               <Row label="Verified on">
                 <span className="font-mono text-xs text-foreground">
-                  Stellar ledger 54,219,003
+                  Stellar ledger 3,262,727
                 </span>
               </Row>
               <Row label="Verification time">

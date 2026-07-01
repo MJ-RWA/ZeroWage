@@ -13,7 +13,7 @@ const points = [
   },
   {
     icon: KeyRound,
-    title: 'Audited circuits',
+    title: 'Open-source circuits',
     desc: 'Our payroll circuits are independently audited and open for public review.',
   },
   {
@@ -39,7 +39,7 @@ export function Security() {
               complete salary privacy.
             </p>
             <div className="mt-8 flex flex-wrap gap-3">
-              {['SOC 2 Type II', 'GDPR', 'ISO 27001', 'Audited circuits'].map(
+              {['GDPR','Open-source circuits'].map(
                 (b) => (
                   <span
                     key={b}
