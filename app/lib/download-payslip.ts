@@ -8,7 +8,7 @@ export async function downloadPayslip(
   const { createElement } = await import('react')
   const { PayslipDocument } = await import('./payslip-pdf')
 
-  const doc = createElement(PayslipDocument, { employee, run, companyName })
+  const doc = PayslipDocument({ employee, run, companyName })
   const blob = await pdf(doc).toBlob()
 
   const url = URL.createObjectURL(blob)

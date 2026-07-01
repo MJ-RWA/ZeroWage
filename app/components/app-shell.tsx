@@ -184,7 +184,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       </aside>
 
       {/* Main */}
-      <div className="md:pl-64">
+      <div className="flex-1 md:pl-64">
         {/* Top bar */}
         <header className="sticky top-0 z-20 flex h-16 items-center justify-between gap-4 border-b border-border bg-background/80 px-4 backdrop-blur-md md:px-8">
           <div className="flex items-center gap-3 md:hidden">
@@ -203,12 +203,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 min-w-0">
           <WalletButton />
           <Button asChild size="sm" className="gap-1.5">
           <Link href="/dashboard/new">
           <Plus className="size-4" />
-          New Payroll Run
+          <span className="hidden sm:inline">New Payroll Run</span>
           </Link>
           </Button>
          </div>
@@ -216,7 +216,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </header>
 
         {/* Mobile nav */}
-        <div className="flex gap-1 overflow-x-auto border-b border-border px-4 py-2 md:hidden">
+        <div className="flex gap-1 overflow-x-auto whitespace-nowrap border-b border-border px-4 py-2 md:hidden">
           {nav.map((item) => {
             const active =
               item.href === '/dashboard'

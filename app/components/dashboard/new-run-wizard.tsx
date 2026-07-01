@@ -523,72 +523,74 @@ function InputStep({
       </div>
 
       <div className="mt-5 overflow-hidden rounded-lg border border-border">
-        <table className="w-full text-left text-sm">
-          <thead>
-            <tr className="border-b border-border text-xs text-muted-foreground">
-              <th className="px-4 py-2.5 font-medium">Name</th>
-              <th className="px-4 py-2.5 font-medium">Department</th>
-              <th className="px-4 py-2.5 font-medium">Stellar Wallet (G...)</th>
-              <th className="px-4 py-2.5 text-right font-medium">Amount (USDC)</th>
-              <th className="px-4 py-2.5 w-8" />
-            </tr>
-          </thead>
-          <tbody>
-            {employees.map((emp, i) => (
-              <tr key={emp.id} className="border-b border-border/70 last:border-0">
-                <td className="px-4 py-2">
-                  <input
-                    value={emp.name}
-                    onChange={(e) => updateEmployee(emp.id, 'name', e.target.value)}
-                    placeholder={`Employee ${i + 1}`}
-                    className="w-full bg-transparent text-foreground placeholder-muted-foreground focus:outline-none text-sm"
-                  />
-                </td>
-                <td className="px-4 py-2">
-                  <select
-                    value={emp.department}
-                    onChange={(e) => updateEmployee(emp.id, 'department', e.target.value)}
-                    className="bg-transparent text-muted-foreground text-xs focus:outline-none w-full"
-                  >
-                    <option value="">Dept.</option>
-                    {DEPARTMENTS.map((d) => (
-                      <option key={d} value={d}>{d}</option>
-                    ))}
-                  </select>
-                </td>
-                <td className="px-4 py-2">
-                  <input
-                    value={emp.wallet}
-                    onChange={(e) => updateEmployee(emp.id, 'wallet', e.target.value)}
-                    placeholder="GABC...XYZ"
-                    className="w-full bg-transparent text-muted-foreground placeholder-muted-foreground focus:outline-none text-sm font-mono"
-                  />
-                </td>
-                <td className="px-4 py-2">
-                  <input
-                    value={emp.amount}
-                    onChange={(e) => updateEmployee(emp.id, 'amount', e.target.value)}
-                    placeholder="0"
-                    type="number"
-                    className="w-full bg-transparent text-foreground placeholder-muted-foreground focus:outline-none text-sm font-mono text-right"
-                  />
-                </td>
-                <td className="px-4 py-2">
-                  <button
-                    onClick={() => removeEmployee(emp.id)}
-                    className="text-muted-foreground hover:text-destructive transition-colors"
-                  >
-                    <Trash2 size={13} />
-                  </button>
-                </td>
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[560px] text-left text-sm">
+            <thead>
+              <tr className="border-b border-border text-xs text-muted-foreground">
+                <th className="px-4 py-2.5 font-medium">Name</th>
+                <th className="px-4 py-2.5 font-medium">Department</th>
+                <th className="px-4 py-2.5 font-medium">Stellar Wallet (G...)</th>
+                <th className="px-4 py-2.5 text-right font-medium">Amount (USDC)</th>
+                <th className="px-4 py-2.5 w-8" />
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {employees.map((emp, i) => (
+                <tr key={emp.id} className="border-b border-border/70 last:border-0">
+                  <td className="px-4 py-2">
+                    <input
+                      value={emp.name}
+                      onChange={(e) => updateEmployee(emp.id, 'name', e.target.value)}
+                      placeholder={`Employee ${i + 1}`}
+                      className="w-full bg-transparent text-foreground placeholder-muted-foreground focus:outline-none text-sm"
+                    />
+                  </td>
+                  <td className="px-4 py-2">
+                    <select
+                      value={emp.department}
+                      onChange={(e) => updateEmployee(emp.id, 'department', e.target.value)}
+                      className="bg-transparent text-muted-foreground text-xs focus:outline-none w-full"
+                    >
+                      <option value="">Dept.</option>
+                      {DEPARTMENTS.map((d) => (
+                        <option key={d} value={d}>{d}</option>
+                      ))}
+                    </select>
+                  </td>
+                  <td className="px-4 py-2">
+                    <input
+                      value={emp.wallet}
+                      onChange={(e) => updateEmployee(emp.id, 'wallet', e.target.value)}
+                      placeholder="GABC...XYZ"
+                      className="w-full bg-transparent text-muted-foreground placeholder-muted-foreground focus:outline-none text-sm font-mono"
+                    />
+                  </td>
+                  <td className="px-4 py-2">
+                    <input
+                      value={emp.amount}
+                      onChange={(e) => updateEmployee(emp.id, 'amount', e.target.value)}
+                      placeholder="0"
+                      type="number"
+                      className="w-full bg-transparent text-foreground placeholder-muted-foreground focus:outline-none text-sm font-mono text-right"
+                    />
+                  </td>
+                  <td className="px-4 py-2">
+                    <button
+                      onClick={() => removeEmployee(emp.id)}
+                      className="text-muted-foreground hover:text-destructive transition-colors"
+                    >
+                      <Trash2 size={13} />
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
 
         {/* Table footer */}
         <div className="border-t border-border bg-background/50 px-4 py-3">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             {/* Actions */}
             <div className="flex items-center gap-3">
               <button
@@ -666,7 +668,7 @@ function ReviewStep({
         Confirm recipients and amounts. After this step, a ZK proof will be generated in your browser.
       </p>
 
-      <div className="mt-5 grid grid-cols-3 gap-px overflow-hidden rounded-lg border border-border bg-border">
+      <div className="mt-5 grid grid-cols-1 sm:grid-cols-3 gap-px overflow-hidden rounded-lg border border-border bg-border">
         <div className="bg-card p-4">
           <p className="text-xs text-muted-foreground">Cycle</p>
           <p className="mt-1 font-mono text-sm font-semibold text-foreground">{cycleId}</p>
@@ -683,7 +685,7 @@ function ReviewStep({
         </div>
       </div>
 
-      <div className="mt-5 overflow-hidden rounded-lg border border-border">
+      <div className="mt-5 overflow-x-auto rounded-lg border border-border">
         <table className="w-full text-left text-sm">
           <thead>
             <tr className="border-b border-border text-xs text-muted-foreground">
@@ -696,7 +698,7 @@ function ReviewStep({
             {employees.map((e) => (
               <tr key={e.id} className="border-b border-border/70 last:border-0">
                 <td className="px-4 py-2.5 text-foreground">{e.name}</td>
-                <td className="px-4 py-2.5 font-mono text-xs text-muted-foreground">{e.wallet}</td>
+                <td className="px-4 py-2.5 font-mono text-xs text-muted-foreground truncate max-w-[120px]">{e.wallet}</td>
                 <td className="px-4 py-2.5 text-right font-mono text-foreground">
                   {parseFloat(e.amount).toLocaleString()} USDC
                 </td>
@@ -1084,7 +1086,7 @@ function SuccessStep({
           </div>
           <div className="flex justify-between">
             <span className="text-muted-foreground">Hash</span>
-            <span className="text-primary">
+            <span className="text-primary font-mono text-xs truncate max-w-[120px]">
               {txHash.slice(0, 16)}...{txHash.slice(-8)}
             </span>
           </div>
@@ -1110,7 +1112,7 @@ function SuccessStep({
             </div>
             <div className="flex justify-between">
               <span className="text-muted-foreground">Hash</span>
-              <span className="text-primary">
+              <span className="text-primary font-mono text-xs truncate max-w-[120px]">
                 {paymentTxHash.slice(0, 16)}...{paymentTxHash.slice(-8)}
               </span>
             </div>
@@ -1158,7 +1160,7 @@ function SuccessStep({
         )}
 
         {/* Action buttons */}
-        <div className="flex gap-2 mt-4">
+        <div className="flex flex-wrap gap-2 mt-4">
           <button
             onClick={async () => {
               const runs = JSON.parse(localStorage.getItem('zerowage_runs') || '[]')

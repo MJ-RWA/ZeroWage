@@ -41,7 +41,7 @@ async function handleLaunch() {
             Groth16 zero-knowledge proofs, live on Stellar
           </div>
 
-          <h1 className="mt-6 text-balance text-5xl font-semibold leading-[1.05] tracking-tight text-foreground md:text-7xl">
+          <h1 className="mt-6 text-balance text-4xl font-semibold leading-[1.05] tracking-tight text-foreground sm:text-7xl md:text-7xl break-words">
             Pay your team.
             <br />
             <span className="text-primary">Prove it cryptographically.</span>
@@ -85,14 +85,14 @@ async function handleLaunch() {
         </div>
 
         {/* Product preview */}
-        <div className="relative mx-auto mt-16 max-w-5xl">
+        <div className="relative mx-auto mt-16 max-w-5xl px-4 sm:px-0">
           <div className="overflow-hidden rounded-xl border border-border bg-card shadow-2xl shadow-black/40">
             <div className="flex items-center gap-2 border-b border-border px-4 py-3">
               <span className="size-2.5 rounded-full bg-secondary" />
               <span className="size-2.5 rounded-full bg-secondary" />
               <span className="size-2.5 rounded-full bg-secondary" />
               <span className="ml-3 font-mono text-xs text-muted-foreground">
-                app.ZeroWage.com/dashboard
+                zerowage.vercel.app/dashboard
               </span>
             </div>
             <HeroPreview />
@@ -138,47 +138,49 @@ function HeroPreview() {
 
       <div className="bg-card p-5 md:col-span-3">
         <div className="overflow-hidden rounded-lg border border-border">
-          <table className="w-full text-left text-sm">
-            <thead>
-              <tr className="border-b border-border text-xs text-muted-foreground">
-                <th className="px-4 py-2.5 font-medium">Payroll run</th>
-                <th className="px-4 py-2.5 text-right font-medium">Employees</th>
-                <th className="px-4 py-2.5 text-right font-medium">Amount</th>
-                <th className="px-4 py-2.5 text-right font-medium">Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((r) => (
-                <tr key={r.cycle} className="border-b border-border last:border-0">
-                  <td className="px-4 py-3 text-foreground">{r.cycle}</td>
-                  <td className="px-4 py-3 text-right font-mono text-muted-foreground">
-                    {r.emp}
-                  </td>
-                  <td className="px-4 py-3 text-right font-mono text-foreground">
-                    {r.amt}
-                  </td>
-                  <td className="px-4 py-3 text-right">
-                    <span
-                      className={
-                        r.status === 'Verified'
-                          ? 'inline-flex items-center gap-1.5 rounded-full bg-success/10 px-2.5 py-0.5 text-xs font-medium text-success ring-1 ring-inset ring-success/20'
-                          : 'inline-flex items-center gap-1.5 rounded-full bg-warning/10 px-2.5 py-0.5 text-xs font-medium text-warning ring-1 ring-inset ring-warning/20'
-                      }
-                    >
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[340px] text-left text-sm">
+              <thead>
+                <tr className="border-b border-border text-xs text-muted-foreground">
+                  <th className="px-4 py-2.5 font-medium">Payroll run</th>
+                  <th className="hidden sm:table-cell px-4 py-2.5 text-right font-medium">Employees</th>
+                  <th className="px-4 py-2.5 text-right font-medium">Amount</th>
+                  <th className="px-4 py-2.5 text-right font-medium">Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((r) => (
+                  <tr key={r.cycle} className="border-b border-border last:border-0">
+                    <td className="px-4 py-3 text-foreground">{r.cycle}</td>
+                    <td className="hidden sm:table-cell px-4 py-3 text-right font-mono text-muted-foreground">
+                      {r.emp}
+                    </td>
+                    <td className="px-4 py-3 text-right font-mono text-foreground">
+                      {r.amt}
+                    </td>
+                    <td className="px-4 py-3 text-right">
                       <span
                         className={
                           r.status === 'Verified'
-                            ? 'size-1.5 rounded-full bg-success'
-                            : 'size-1.5 rounded-full bg-warning'
+                            ? 'inline-flex items-center gap-1.5 rounded-full bg-success/10 px-2.5 py-0.5 text-xs font-medium text-success ring-1 ring-inset ring-success/20'
+                            : 'inline-flex items-center gap-1.5 rounded-full bg-warning/10 px-2.5 py-0.5 text-xs font-medium text-warning ring-1 ring-inset ring-warning/20'
                         }
-                      />
-                      {r.status}
-                    </span>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                      >
+                        <span
+                          className={
+                            r.status === 'Verified'
+                              ? 'size-1.5 rounded-full bg-success'
+                              : 'size-1.5 rounded-full bg-warning'
+                          }
+                        />
+                        {r.status}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
     </div>
