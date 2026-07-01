@@ -4,6 +4,7 @@ import { AppShell } from '@/components/app-shell'
 import { useState, useEffect } from 'react'
 import { OnboardingModal } from '@/components/onboarding/onboarding-modal'
 import { Protected } from '@/components/auth/protected'
+import { Toaster } from 'sonner'
 
 
 export default function DashboardLayout({
@@ -31,6 +32,7 @@ export default function DashboardLayout({
     <>
       <Protected>
       <AppShell>{children}</AppShell>
+      <Toaster richColors position="top-right" />
       <OnboardingModal walletAddress={wallet ?? undefined} />
       </Protected>
     </>
