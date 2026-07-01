@@ -110,7 +110,7 @@ export default function DocsPage() {
             ].map((row) => (
               <div key={row.label} className="flex gap-6 px-5 py-4 flex-wrap">
                 <div className="text-sm font-medium text-foreground w-40 shrink-0">{row.label}</div>
-                <div className="text-sm text-muted-foreground flex-1">{row.value}</div>
+                <div className="text-sm text-muted-foreground flex-1 break-all">{row.value}</div>
               </div>
             ))}
           </div>

@@ -132,7 +132,8 @@ export function ActivityFeed() {
           <span className="text-xs text-muted-foreground">
             Page {page} of {totalPages}
           </span>
-          <div className="flex items-center gap-1">
+          <div className="overflow-x-auto">
+            <div className="flex items-center gap-1 whitespace-nowrap pb-1">
             <button
               onClick={() => setPage((p) => Math.max(1, p - 1))}
               disabled={page === 1}
@@ -160,9 +161,10 @@ export function ActivityFeed() {
             >
               <ChevronRight size={13} />
             </button>
-          </div>
-        </div>
-      )}
+           </div>
+         </div>
+         </div>
+       )}
     </div>
   )
 }

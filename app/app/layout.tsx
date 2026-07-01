@@ -43,7 +43,7 @@ export default function RootLayout({
       className={`dark ${inter.variable} ${jetbrainsMono.variable}`}
       suppressHydrationWarning
     >
-      <body className="bg-background font-sans antialiased">
+      <body className="bg-background font-sans antialiased overflow-x-hidden">
         <WalletProvider>
         {children}
         </WalletProvider>

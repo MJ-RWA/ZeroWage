@@ -152,7 +152,7 @@ export default function EmployeesPage() {
                         {emp.department}
                       </span>
                     </td>
-                    <td className="px-5 py-3.5 font-mono text-xs text-muted-foreground">
+                    <td className="px-5 py-3.5 font-mono text-xs text-muted-foreground truncate max-w-[120px]">
                       {emp.wallet.slice(0, 8)}...{emp.wallet.slice(-6)}
                     </td>
                     <td className="px-5 py-3.5 text-right font-mono font-semibold text-foreground">

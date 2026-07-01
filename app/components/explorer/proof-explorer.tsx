@@ -29,7 +29,7 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   return (
     <div className="flex items-center justify-between gap-3 bg-card px-5 py-3.5">
       <span className="text-xs text-muted-foreground shrink-0">{label}</span>
-      <span className="text-right font-mono text-xs text-foreground">{children}</span>
+      <span className="text-right font-mono text-xs text-foreground truncate min-w-0">{children}</span>
     </div>
   )
 }
@@ -92,14 +92,14 @@ export function ProofExplorer() {
             Browse and verify Groth16 payroll proofs anchored on Stellar.
           </p>
         </div>
-        <div className="flex gap-6">
+        <div className="flex flex-wrap gap-3 sm:gap-6">
           <Stat label="Total proofs" value={String(runs.length)} />
           <Stat label="Verified" value={String(runs.length)} />
           <Stat label="Circuit" value="Groth16" />
         </div>
       </div>
 
-      <div className="mt-6 grid gap-px overflow-hidden rounded-xl border border-border bg-border lg:grid-cols-[minmax(320px,420px)_1fr]">
+      <div className="mt-6 grid grid-cols-1 gap-px overflow-hidden rounded-xl border border-border bg-border lg:grid-cols-[minmax(320px,420px)_1fr]">
         {/* Left: list */}
         <div className="bg-card">
           <div className="border-b border-border px-4 py-3">

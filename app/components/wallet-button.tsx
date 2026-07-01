@@ -67,7 +67,7 @@ export function WalletButton() {
         title="Click to disconnect"
       >
         <span className="size-2 rounded-full bg-green-400" />
-        <span className="font-mono text-xs text-foreground">
+        <span className="max-w-[80px] truncate font-mono text-xs text-foreground">
           {address.slice(0, 6)}…{address.slice(-4)}
         </span>
         <LogOut className="size-3.5 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />

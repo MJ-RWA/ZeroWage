@@ -18,7 +18,7 @@ function Field({
   onChange?: (v: string) => void
 }) {
   return (
-    <div className="grid gap-2 border-b border-border py-5 last:border-0 md:grid-cols-[240px_1fr] md:items-center md:gap-6">
+     <div className="grid grid-cols-1 gap-2 border-b border-border py-5 last:border-0 md:grid-cols-[240px_1fr] md:items-center md:gap-6">
       <div>
         <p className="text-sm font-medium text-foreground">{label}</p>
         {hint && (

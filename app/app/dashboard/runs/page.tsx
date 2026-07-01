@@ -71,7 +71,7 @@ export default function RunsPage() {
             </Button>
           </div>
         ) : (
-          <div className="overflow-hidden rounded-xl border border-border bg-card">
+          <div className="overflow-x-auto rounded-xl border border-border bg-card">
             <table className="w-full text-left text-sm">
               <thead>
                 <tr className="border-b border-border text-xs text-muted-foreground">
@@ -114,7 +114,7 @@ export default function RunsPage() {
                     <td className="px-5 py-4">
                     <StatusBadge status={run.status} />
                     </td>
-                    <td className="px-5 py-4 font-mono text-xs text-primary">
+                    <td className="px-5 py-4 font-mono text-xs text-primary truncate max-w-[120px]">
                       {run.proofTxHash.slice(0, 8)}...{run.proofTxHash.slice(-6)}
                     </td>
                     <td className="px-5 py-4">

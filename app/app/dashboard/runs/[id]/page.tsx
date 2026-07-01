@@ -49,7 +49,7 @@ function DetailRow({
   return (
     <div className="flex items-center justify-between gap-4 px-5 py-3.5 border-b border-border last:border-0">
       <span className="text-xs text-muted-foreground shrink-0">{label}</span>
-      <span className="text-right text-sm text-foreground font-mono">
+      <span className="text-right text-sm text-foreground font-mono min-w-0 truncate">
         {children}
       </span>
     </div>
@@ -197,7 +197,7 @@ export default function RunDetailPage() {
         </div>
       </div>
 
-      <div className="mt-6 grid gap-6 lg:grid-cols-3">
+      <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-6">
         <div className="flex flex-col gap-6 lg:col-span-2">
 
           {/* Proof metadata */}
@@ -212,7 +212,7 @@ export default function RunDetailPage() {
             <div className="divide-y divide-border">
               <DetailRow label="Proof tx hash">
                 <div className="flex items-center gap-2">
-                  <span className="text-primary">
+                  <span className="text-primary font-mono text-xs truncate max-w-[120px]">
                     {run.proofTxHash
                       ? `${run.proofTxHash.slice(0, 20)}...${run.proofTxHash.slice(-8)}`
                       : '—'}
@@ -235,7 +235,7 @@ export default function RunDetailPage() {
               {run.paymentTxHash && (
                 <DetailRow label="Payment tx hash">
                   <div className="flex items-center gap-2">
-                    <span className="text-primary">
+                    <span className="text-primary font-mono text-xs truncate max-w-[120px]">
                       {run.paymentTxHash.slice(0, 20)}...
                       {run.paymentTxHash.slice(-8)}
                     </span>
@@ -287,7 +287,7 @@ export default function RunDetailPage() {
                       <td className="px-5 py-3.5 text-foreground font-medium">
                         {emp.name}
                       </td>
-                      <td className="px-5 py-3.5 font-mono text-xs text-muted-foreground">
+                      <td className="px-5 py-3.5 font-mono text-xs text-muted-foreground truncate max-w-[120px]">
                         {emp.wallet.slice(0, 8)}...{emp.wallet.slice(-6)}
                       </td>
                       <td className="px-5 py-3.5 text-right font-mono font-semibold text-foreground">

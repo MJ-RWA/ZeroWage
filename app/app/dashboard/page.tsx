@@ -42,7 +42,7 @@ export default function DashboardPage() {
         <KpiRow />
       </div>
 
-      <div className="mt-8 grid gap-6 lg:grid-cols-3">
+      <div className="mt-8 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2">
           <div className="mb-3 flex items-center justify-between">
             <h2 className="text-sm font-medium text-foreground">
@@ -70,7 +70,7 @@ export default function DashboardPage() {
               </Button>
             </div>
           ) : (
-            <div className="overflow-hidden rounded-xl border border-border bg-card">
+            <div className="overflow-x-auto rounded-xl border border-border bg-card">
               <table className="w-full text-left text-sm">
                 <thead>
                   <tr className="border-b border-border text-xs text-muted-foreground">
