@@ -119,7 +119,7 @@ function HeroPreview() {
       <div className="bg-card p-5">
         <p className="text-xs text-muted-foreground">Total paid this cycle</p>
         <p className="mt-2 font-mono text-2xl font-semibold text-foreground">
-          $1.28M
+          $100
         </p>
         <p className="mt-1 text-xs text-success">3 employees · 100% verified</p>
       </div>
