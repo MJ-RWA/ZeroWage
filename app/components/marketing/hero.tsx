@@ -92,7 +92,7 @@ async function handleLaunch() {
               <span className="size-2.5 rounded-full bg-secondary" />
               <span className="size-2.5 rounded-full bg-secondary" />
               <span className="ml-3 font-mono text-xs text-muted-foreground">
-                zerowage.vercel.app/dashboard
+                zerowage-theta.vercel.app/dashboard
               </span>
             </div>
             <HeroPreview />
