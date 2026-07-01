@@ -79,7 +79,7 @@ async function handleLaunch() {
               <ShieldCheck className="size-3.5 text-success" /> On-chain verification
             </span>
             <span className="flex items-center gap-1.5">
-              <CircleCheck className="size-3.5 text-success" /> SOC 2 Type II
+              <CircleCheck className="size-3.5 text-success" /> 
             </span>
           </div>
         </div>
@@ -110,9 +110,9 @@ async function handleLaunch() {
 
 function HeroPreview() {
   const rows = [
-    { cycle: 'February 2026 — Cycle 24', emp: 142, amt: '1,284,500 USDC', status: 'Verified' },
+    { cycle: 'February 2026 — Cycle 24', emp: 3, amt: '74 USDC', status: 'Verified' },
     { cycle: 'February — Contractors', emp: 36, amt: '318,400 USDC', status: 'Pending' },
-    { cycle: 'Q1 Bonus Pool — 2026', emp: 142, amt: '642,000 XLM', status: 'Verified' },
+    { cycle: 'Q1 Bonus Pool — 2026', emp: 3, amt: '642,000 XLM', status: 'Verified' },
   ]
   return (
     <div className="grid gap-px bg-border md:grid-cols-3">
@@ -121,19 +121,19 @@ function HeroPreview() {
         <p className="mt-2 font-mono text-2xl font-semibold text-foreground">
           $1.28M
         </p>
-        <p className="mt-1 text-xs text-success">142 employees · 100% verified</p>
+        <p className="mt-1 text-xs text-success">3 employees · 100% verified</p>
       </div>
       <div className="bg-card p-5">
         <p className="text-xs text-muted-foreground">Proof generation</p>
         <p className="mt-2 font-mono text-2xl font-semibold text-foreground">
           2.84s
         </p>
-        <p className="mt-1 text-xs text-muted-foreground">Groth16 · 1.04M constraints</p>
+        <p className="mt-1 text-xs text-muted-foreground">Groth16 · 1,065 constraints</p>
       </div>
       <div className="bg-card p-5">
         <p className="text-xs text-muted-foreground">On-chain verification</p>
         <p className="mt-2 font-mono text-2xl font-semibold text-foreground">6ms</p>
-        <p className="mt-1 text-xs text-muted-foreground">Stellar ledger 54,219,003</p>
+        <p className="mt-1 text-xs text-muted-foreground">Stellar ledger 3,262,727</p>
       </div>
 
       <div className="bg-card p-5 md:col-span-3">

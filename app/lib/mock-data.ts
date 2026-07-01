@@ -47,7 +47,7 @@ export const payrollRuns: PayrollRun[] = [
     cycle: 'February 2026 — Cycle 24',
     period: 'Feb 1 – Feb 29, 2026',
     date: '2026-02-28',
-    employees: 142,
+    employees: 3,
     totalAmount: 1284500,
     asset: 'USDC',
     status: 'verified',
