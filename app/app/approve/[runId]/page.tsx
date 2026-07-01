@@ -22,6 +22,7 @@ interface ApprovalPayload {
   recipients: number
   date: string
   adminWallet: string
+  approverWallet?: string
 }
 
 export default function ApprovePage() {
@@ -55,13 +56,14 @@ export default function ApprovePage() {
         // Validate the runId in the URL matches the payload
         if (payload.id === runId) {
           setRun({
-            id:          payload.id,
-            cycleId:     payload.cycleId,
-            total:       payload.total,
-            recipients:  payload.recipients,
-            date:        payload.date,
-            adminWallet: payload.adminWallet,
-            status:      'draft',
+            id:             payload.id,
+            cycleId:        payload.cycleId,
+            total:          payload.total,
+            recipients:     payload.recipients,
+            date:           payload.date,
+            adminWallet:    payload.adminWallet,
+            approverWallet: payload.approverWallet || '',
+            status:         'draft',
           })
           return
         }
@@ -100,19 +102,20 @@ export default function ApprovePage() {
   }
 
   async function handleApprove() {
-  if (!walletAddress) {
-    await connectWallet()
-    return
-  }
+    if (!walletAddress) {
+      await connectWallet()
+      return
+    }
 
-  // Guard: if the run specifies an approver wallet, only that wallet can approve
-  const expectedApprover = (run as any).approverWallet
-  if (expectedApprover && walletAddress !== expectedApprover) {
-    setError(
-      `This run requires approval from ${expectedApprover.slice(0, 8)}...${expectedApprover.slice(-6)}. You are connected as ${walletAddress.slice(0, 8)}...${walletAddress.slice(-6)}.`
-    )
-    return
-  }
+    // Guard: if the run specifies an approver wallet, only that wallet can approve
+    const expectedApprover = (run as any).approverWallet
+    if (expectedApprover && walletAddress !== expectedApprover) {
+      setError(
+        `This run requires approval from ${expectedApprover.slice(0, 8)}...${expectedApprover.slice(-6)}. You are connected as ${walletAddress.slice(0, 8)}...${walletAddress.slice(-6)}.`
+      )
+      return
+    }
+
     setApproving(true)
     setError(null)
 
@@ -285,6 +288,19 @@ export default function ApprovePage() {
                 browser. You are approving the aggregate total only.
               </p>
             </div>
+
+            {/* Approver requirement notice */}
+            {run.approverWallet && (
+              <div className="mx-6 mb-5 rounded-lg border border-blue-500/20 bg-blue-500/5 px-4 py-3 flex items-start gap-2">
+                <Shield size={12} className="text-blue-400 mt-0.5 shrink-0" />
+                <p className="text-xs text-muted-foreground leading-relaxed">
+                  This run requires approval from a specific wallet:{' '}
+                  <span className="font-mono text-foreground">
+                    {run.approverWallet.slice(0, 8)}...{run.approverWallet.slice(-6)}
+                  </span>
+                </p>
+              </div>
+            )}
 
             {/* Wallet status */}
             {walletAddress ? (

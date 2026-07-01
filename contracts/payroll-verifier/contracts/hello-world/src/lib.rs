@@ -288,24 +288,149 @@ mod test {
     use super::*;
     use soroban_sdk::{testutils::Ledger, Env, String, Bytes};
 
+    // Helper: build a syntactically valid but cryptographically meaningless
+    // proof and VK for structural tests (won't pass real verification,
+    // but lets us test storage/access logic in isolation)
+    fn dummy_proof(env: &Env) -> Bytes {
+        // pi_a (64) + pi_b (128) + pi_c (64) = 256 bytes
+        Bytes::from_slice(env, &[7u8; 256])
+    }
+
+    fn dummy_public_signals(env: &Env) -> Bytes {
+        // 4-byte len prefix + 4 signals * 32 bytes = 132 bytes
+        let mut b = Bytes::new(env);
+        b.extend_from_array(&4u32.to_be_bytes());
+        for _ in 0..4 {
+            b.extend_from_array(&[0u8; 32]);
+        }
+        b
+    }
+
+    fn dummy_vk_bytes(env: &Env) -> Bytes {
+        // alpha(64) + beta(128) + gamma(128) + delta(128) + ic_len(4) + 5*ic(320) = 772
+        let mut b = Bytes::new(env);
+        b.extend_from_array(&[1u8; 64]);   // alpha
+        b.extend_from_array(&[2u8; 128]);  // beta
+        b.extend_from_array(&[3u8; 128]);  // gamma
+        b.extend_from_array(&[4u8; 128]);  // delta
+        b.extend_from_array(&5u32.to_be_bytes()); // IC count
+        for _ in 0..5 {
+            b.extend_from_array(&[5u8; 64]);
+        }
+        b
+    }
+
+    // ── Test 1: VK not set rejects verification ─────────────────────────
     #[test]
     fn test_vk_not_set_returns_error() {
         let env = Env::default();
         let contract_id = env.register(PayrollVerifier, ());
         let client = PayrollVerifierClient::new(&env, &contract_id);
-
         env.ledger().set_timestamp(1234567890);
 
-        // Should fail because VK not set
         let result = client.try_verify_and_record(
             &String::from_str(&env, "EMPLOYER1"),
             &String::from_str(&env, "JUNE-2026"),
             &18500,
             &5,
-            &Bytes::from_slice(&env, &[1u8; 32]),
-            &Bytes::from_slice(&env, &[0u8; 36]),
+            &dummy_proof(&env),
+            &dummy_public_signals(&env),
         );
 
         assert!(result.is_err());
+    }
+
+    // ── Test 2: malformed proof bytes are rejected before pairing check ──
+    #[test]
+    fn test_malformed_proof_rejected() {
+        let env = Env::default();
+        let contract_id = env.register(PayrollVerifier, ());
+        let client = PayrollVerifierClient::new(&env, &contract_id);
+        env.ledger().set_timestamp(1234567890);
+
+        // Set a structurally valid VK first
+        client.set_vk(&dummy_vk_bytes(&env));
+
+        // Proof that's too short — should fail to deserialize, not panic
+        let bad_proof = Bytes::from_slice(&env, &[1u8; 10]);
+
+        let result = client.try_verify_and_record(
+            &String::from_str(&env, "EMPLOYER1"),
+            &String::from_str(&env, "JUNE-2026"),
+            &18500,
+            &5,
+            &bad_proof,
+            &dummy_public_signals(&env),
+        );
+
+        assert!(result.is_err());
+    }
+
+    // ── Test 3: malformed public signals are rejected ────────────────────
+    #[test]
+    fn test_malformed_public_signals_rejected() {
+        let env = Env::default();
+        let contract_id = env.register(PayrollVerifier, ());
+        let client = PayrollVerifierClient::new(&env, &contract_id);
+        env.ledger().set_timestamp(1234567890);
+
+        client.set_vk(&dummy_vk_bytes(&env));
+
+        // Public signals claiming 4 entries but only providing data for 1
+        let mut bad_signals = Bytes::new(&env);
+        bad_signals.extend_from_array(&4u32.to_be_bytes());
+        bad_signals.extend_from_array(&[0u8; 32]); // only one 32-byte chunk
+
+        let result = client.try_verify_and_record(
+            &String::from_str(&env, "EMPLOYER1"),
+            &String::from_str(&env, "JUNE-2026"),
+            &18500,
+            &5,
+            &dummy_proof(&env),
+            &bad_signals,
+        );
+
+        assert!(result.is_err());
+    }
+
+    // ── Test 4: malformed verification key is rejected at set_vk time ────
+    #[test]
+    fn test_malformed_vk_rejected_at_set_time() {
+        let env = Env::default();
+        let contract_id = env.register(PayrollVerifier, ());
+        let client = PayrollVerifierClient::new(&env, &contract_id);
+
+        // Too short to contain even alpha + beta
+        let bad_vk = Bytes::from_slice(&env, &[9u8; 20]);
+
+        let result = client.try_set_vk(&bad_vk);
+        assert!(result.is_err());
+    }
+
+    // ── Test 5: get_run returns None for a run that was never recorded ───
+    #[test]
+    fn test_get_run_returns_none_when_not_recorded() {
+        let env = Env::default();
+        let contract_id = env.register(PayrollVerifier, ());
+        let client = PayrollVerifierClient::new(&env, &contract_id);
+        env.ledger().set_timestamp(1234567890);
+
+        let run = client.get_run(
+            &String::from_str(&env, "NEVER-RAN-PAYROLL"),
+            &String::from_str(&env, "JUNE-2026"),
+        );
+
+        assert!(run.is_none());
+    }
+
+    // ── Test 6: is_nullifier_used correctly reports false for unused proof ─
+    #[test]
+    fn test_nullifier_unused_by_default() {
+        let env = Env::default();
+        let contract_id = env.register(PayrollVerifier, ());
+        let client = PayrollVerifierClient::new(&env, &contract_id);
+
+        let used = client.is_nullifier_used(&dummy_proof(&env));
+        assert_eq!(used, false);
     }
 }

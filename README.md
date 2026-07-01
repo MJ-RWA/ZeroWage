@@ -29,7 +29,7 @@ Here's the idea that breaks the bind: you don't need to reveal a number to prove
 
 This isn't new cryptography. zk-SNARKs have existed since 2012 and power Zcash's shielded transactions today. What's new is that **nobody had built this for payroll, and until recently, nobody could verify it cheaply enough on-chain to make it real.**
 
-ZeroWage is the first payroll system where the zero-knowledge proof isn't a feature bolted onto a database — it *is* the payroll system. There is no private salary database to breach, because there is no salary database at all. The only persistent record is a Soroban smart contract on Stellar that stores a single boolean per payroll cycle: `proof_verified: true`. Everything that made that boolean true — the individual salaries, who got paid what — existed for a few milliseconds in a browser's memory and then was gone.
+ZeroWage is the first payroll protocol with on-chain ZK verification on Stellar where the zero-knowledge proof isn't a feature bolted onto a database — it *is* the payroll system. There is no private salary database to breach, because there is no centralized salary database. Salary amounts are stored locally in the admin's browser and are never transmitted to any server or recorded on-chain. The only persistent record is a Soroban smart contract on Stellar that stores a single boolean per payroll cycle: `proof_verified: true`. Everything that made that boolean true — the individual salaries, who got paid what — existed for a few milliseconds in a browser's memory and then was gone.
 
 ---
 
@@ -223,8 +223,9 @@ Combined with the Poseidon commitment baked into the circuit itself — which bi
 - A **Proof Explorer** with a split-panel layout: every verified proof, its public inputs in the open, its private salary inputs rendered as `████████`
 - A public, unauthenticated **attestation page** (`/verify/[txHash]`) that fetches the transaction straight from Stellar Horizon — built for auditors, boards, or anyone who needs to verify a claim without ever touching the app
 
-**Documentation that treats judges like engineers**
+**Documentations**
 - `/docs` — quickstart and security model
+- `/docs/TECHNICAL.md` 
 - `/docs/circuit` — full constraint table, signal visibility table, trusted setup provenance
 - `/docs/api` — request/response schemas for every contract interaction
 - `/pricing`, `/status` — because a real product has these, even at hackathon stage
@@ -383,6 +384,12 @@ Beyond the cryptography, Stellar is simply the right chain for moving payroll: U
 
 ---
 
+## Documentation
+
+- [Technical Architecture](docs/TECHNICAL.md)
+
+---
+
 ## Future Roadmap
 
 **Recursive proof aggregation** — the current circuit handles 20 recipients per proof. Batch multiple 20-person proofs and aggregate them into a single recursive Groth16 proof, so a 10,000-employee company gets one on-chain verification, not five hundred.
@@ -396,6 +403,8 @@ Beyond the cryptography, Stellar is simply the right chain for moving payroll: U
 **TEE-based jurisdictional compliance** — a Trusted Execution Environment that attests salary inputs satisfy region-specific minimum-wage or withholding rules, without the TEE — or anyone — learning the actual figures.
 
 **Cross-chain attestation portability** — export Stellar-verified payroll proofs as W3C Verifiable Credentials, recognized by any chain with BN254 precompiles, so a payroll run proven once on Stellar becomes a portable, chain-agnostic compliance artifact.
+
+**Client-side encryption** — Salary data encrypted at rest using AES-GCM with keys derived from the admin's Freighter wallet signature, eliminating plaintext localStorage storage.
 
 ---
 
