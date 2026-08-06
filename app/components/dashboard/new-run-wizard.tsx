@@ -850,15 +850,62 @@ function DraftStep({
     onApproved()
   }
 
-  // Poll Stellar Horizon for a payment whose memo matches the run ID
   useEffect(() => {
-    const interval = setInterval(async () => {
+  if (!adminWallet) return
+
+  let closeStream: (() => void) | null = null
+  let fallbackInterval: ReturnType<typeof setInterval> | null = null
+
+  async function startStreaming() {
+    try {
+      const { Horizon } = await import('@stellar/stellar-sdk')
+      const horizon = new Horizon.Server(
+        'https://horizon-testnet.stellar.org'
+      )
+
+      // Stream new payments to admin wallet in real time
+      closeStream = horizon
+        .payments()
+        .forAccount(adminWallet)
+        .cursor('now')
+        .stream({
+          onmessage: async (payment: any) => {
+            try {
+              const tx = await payment.transaction()
+              const memo: string = tx.memo || ''
+              const runPrefix = draftId.slice(0, 28)
+
+              if (memo === runPrefix) {
+                updateRunStatus(draftId, 'approved', {
+                  approvedAt: new Date().toUTCString(),
+                  approverWallet: payment.from || 'unknown',
+                  approvalSignature: tx.hash,
+                })
+                if (closeStream) closeStream()
+                if (fallbackInterval) clearInterval(fallbackInterval)
+                onApproved()
+              }
+            } catch {}
+          },
+          onerror: () => {
+            // Streaming failed — fall back to polling
+            startPolling()
+          },
+        }) as unknown as () => void
+    } catch {
+      // Streaming not available — fall back to polling
+      startPolling()
+    }
+  }
+
+  function startPolling() {
+    if (fallbackInterval) return // already polling
+    fallbackInterval = setInterval(async () => {
       try {
-        if (!adminWallet) return
-
         const { Horizon } = await import('@stellar/stellar-sdk')
-        const horizon = new Horizon.Server('https://horizon-testnet.stellar.org')
-
+        const horizon = new Horizon.Server(
+          'https://horizon-testnet.stellar.org'
+        )
         const payments = await horizon
           .payments()
           .forAccount(adminWallet)
@@ -869,14 +916,14 @@ function DraftStep({
         for (const payment of payments.records) {
           try {
             const tx = await (payment as any).transaction()
-            const memo = tx.memo
-            if (memo && draftId.slice(0, 28) === memo) {
+            const memo: string = tx.memo || ''
+            if (memo === draftId.slice(0, 28)) {
               updateRunStatus(draftId, 'approved', {
                 approvedAt: new Date().toUTCString(),
                 approverWallet: (payment as any).from || 'unknown',
                 approvalSignature: tx.hash,
               })
-              clearInterval(interval)
+              if (fallbackInterval) clearInterval(fallbackInterval)
               onApproved()
               return
             }
@@ -886,14 +933,20 @@ function DraftStep({
         // Also check localStorage (same-browser self-approval)
         const run = getPayrollRunById(draftId)
         if (run?.status === 'approved') {
-          clearInterval(interval)
+          if (fallbackInterval) clearInterval(fallbackInterval)
           onApproved()
         }
       } catch {}
     }, 5000)
+  }
 
-    return () => clearInterval(interval)
-  }, [draftId, adminWallet, onApproved])
+  startStreaming()
+
+  return () => {
+    if (closeStream) closeStream()
+    if (fallbackInterval) clearInterval(fallbackInterval)
+  }
+}, [draftId, adminWallet, onApproved])
 
   return (
     <div className="p-6">
@@ -957,7 +1010,7 @@ function DraftStep({
       {/* Polling indicator */}
       <div className="flex items-center gap-2 text-xs text-muted-foreground mb-5">
         <div className="size-2 rounded-full bg-yellow-400 animate-pulse" />
-        Polling Stellar for approval every 5 seconds...
+         Listening for approval on Stellar...
       </div>
 
       {/* Self-approve fallback */}

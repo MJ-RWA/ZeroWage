@@ -1,4 +1,6 @@
-pragma circom 2.0.0;
+const fs = require('fs');
+
+const code = `pragma circom 2.0.0;
 
 include "node_modules/circomlib/circuits/comparators.circom";
 include "node_modules/circomlib/circuits/poseidon.circom";
@@ -77,3 +79,7 @@ template Payroll(n) {
 }
 
 component main {public [total, min_salary, n_recipients, commitment]} = Payroll(20);
+`;
+
+fs.writeFileSync('payroll.circom', code);
+console.log('Circuit v3 written');
