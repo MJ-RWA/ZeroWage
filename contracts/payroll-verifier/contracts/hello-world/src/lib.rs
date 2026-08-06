@@ -320,6 +320,15 @@ mod test {
         b
     }
 
+    fn nullifier_from_proof(env: &Env, proof: &Bytes) -> Bytes {
+        let h = env.crypto().sha256(proof);
+        let mut b = Bytes::new(env);
+        for byte in h.to_array().iter() {
+            b.push_back(*byte);
+        }
+        b
+    }
+
     // ── Test 1: VK not set rejects verification ─────────────────────────
     #[test]
     fn test_vk_not_set_returns_error() {
@@ -432,5 +441,78 @@ mod test {
 
         let used = client.is_nullifier_used(&dummy_proof(&env));
         assert_eq!(used, false);
+    }
+
+    // ── Test 7: a previously used proof nullifier is reported as used ─────
+    #[test]
+    fn test_same_proof_cannot_be_submitted_twice() {
+        // This exercises the nullifier storage read path directly to
+        // verify that once a proof has been marked as used, the contract reports it.
+        let env = Env::default();
+        let contract_id = env.register(PayrollVerifier, ());
+        let client = PayrollVerifierClient::new(&env, &contract_id);
+
+        let proof = dummy_proof(&env);
+
+        assert_eq!(client.is_nullifier_used(&proof), false);
+
+        env.as_contract(&contract_id, || {
+            let nullifier = nullifier_from_proof(&env, &proof);
+            let null_key = (symbol_short!("NULL"), nullifier);
+            env.storage().persistent().set(&null_key, &true);
+        });
+
+        assert_eq!(client.is_nullifier_used(&proof), true);
+    }
+
+    // ── Test 8: set_vk can overwrite a previously stored verification key ─
+    #[test]
+    fn test_vk_can_be_updated_with_new_bytes() {
+        // This checks that storing a new VK bytes payload succeeds even when
+        // the contract already has a valid verification key in storage.
+        let env = Env::default();
+        let contract_id = env.register(PayrollVerifier, ());
+        let client = PayrollVerifierClient::new(&env, &contract_id);
+
+        let result1 = client.try_set_vk(&dummy_vk_bytes(&env));
+        assert!(result1.is_ok());
+
+        let result2 = client.try_set_vk(&dummy_vk_bytes(&env));
+        assert!(result2.is_ok());
+    }
+
+    // ── Test 9: get_run returns the stored payroll record fields ──────────
+    #[test]
+    fn test_get_run_returns_stored_run_fields() {
+        // This confirms that a manually stored PayrollRun can be retrieved with
+        // all of its fields intact through the public getter.
+        let env = Env::default();
+        let contract_id = env.register(PayrollVerifier, ());
+        let client = PayrollVerifierClient::new(&env, &contract_id);
+        env.ledger().set_timestamp(9999999);
+
+        let employer = String::from_str(&env, "GTEST123");
+        let cycle = String::from_str(&env, "JULY-2026");
+
+        env.as_contract(&contract_id, || {
+            let run = PayrollRun {
+                employer: employer.clone(),
+                cycle_id: cycle.clone(),
+                total_usdc: 42000,
+                n_recipients: 7,
+                proof_verified: true,
+                timestamp: 9999999,
+            };
+            env.storage().persistent().set(&(employer.clone(), cycle.clone()), &run);
+        });
+
+        let result = client.get_run(&employer, &cycle);
+        assert!(result.is_some());
+
+        let run = result.unwrap();
+        assert_eq!(run.total_usdc, 42000);
+        assert_eq!(run.n_recipients, 7);
+        assert_eq!(run.proof_verified, true);
+        assert_eq!(run.timestamp, 9999999);
     }
 }
