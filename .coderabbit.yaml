@@ -1,0 +1,408 @@
+```yaml
+language: "en-US"
+
+reviews:
+  profile: "assertive"
+
+  # Don't automatically request changes on PRs.
+  request_changes_workflow: false
+
+  high_level_summary: true
+  review_status: true
+  commit_status: true
+  poem: false
+
+  auto_review:
+    enabled: true
+    drafts: false
+
+  path_filters:
+    # Dependencies / generated output
+    - "!**/node_modules/**"
+    - "!**/.next/**"
+    - "!**/dist/**"
+    - "!**/build/**"
+    - "!**/*.lock"
+
+    # Generated ZK artifacts
+    - "!circuits/*.r1cs"
+    - "!circuits/payroll_js/**"
+
+  path_instructions:
+
+    # ============================================================
+    # ZK CIRCUIT
+    # ============================================================
+
+    - path: "circuits/**/*.circom"
+      instructions: |
+        Review this code as security-critical zero-knowledge circuit code.
+
+        Pay particular attention to:
+        - Missing or insufficient constraints.
+        - Signals that are declared but not properly constrained.
+        - Public/private input mistakes.
+        - Constraint bypasses.
+        - Incorrect equality or range constraints.
+        - Arithmetic underflow/overflow assumptions.
+        - Poseidon commitment correctness.
+        - Nullifier correctness and uniqueness.
+        - Whether private salary values can accidentally become public.
+        - Whether the circuit proves the intended payroll statement and nothing weaker.
+        - Changes that could invalidate compatibility with the deployed verifier.
+
+        Do not suggest cosmetic changes when they could distract from
+        circuit soundness or security issues.
+
+    - path: "circuits/**/*.js"
+      instructions: |
+        Review ZK tooling and verification-key encoding code carefully.
+
+        Check:
+        - Correct Groth16 verification-key encoding.
+        - Correct field ordering and byte encoding.
+        - BN254 compatibility.
+        - Endianness issues.
+        - Incorrect serialization/deserialization.
+        - Accidental truncation or precision loss.
+        - Compatibility between the encoded verification key and the
+          Soroban verifier contract.
+        - Whether scripts could accidentally publish the wrong VK
+          to a live contract.
+
+        Treat call_set_vk.js and encode_vk.js as deployment-sensitive code.
+
+    - path: "circuits/trusted_setup/**"
+      instructions: |
+        Treat these files as cryptographic/deployment artifacts.
+
+        Do not recommend modifying trusted setup artifacts unless there
+        is a clear technical reason.
+
+        Flag:
+        - Inconsistencies between verification_key.json and vk_encoded.hex.
+        - Changes to the final zkey or PTAU that are not clearly justified.
+        - Suspicious or unexplained cryptographic artifact changes.
+        - Changes that could cause the frontend and on-chain verifier
+          to use different verification keys.
+
+    # ============================================================
+    # SOROBAN / RUST CONTRACT
+    # ============================================================
+
+    - path: "contracts/**/*.rs"
+      instructions: |
+        Review this as security-critical Soroban smart-contract code.
+
+        Pay particular attention to:
+
+        Authorization:
+        - Every privileged state mutation must authenticate the correct
+          wallet/account.
+        - Verify that the caller is authorized before performing any
+          state-changing operation.
+        - Never rely solely on frontend wallet gating.
+        - Check for confused-deputy authorization paths.
+        - Check admin/operator/approver authorization carefully.
+
+        ZK verification:
+        - BN254 Groth16 verification correctness.
+        - Public input ordering.
+        - Proof component ordering.
+        - Verification-key handling.
+        - Incorrect field conversion or byte encoding.
+        - Replay or proof reuse vulnerabilities.
+        - Nullifier uniqueness and persistence.
+        - Whether verification can be bypassed.
+
+        State:
+        - Incorrect storage keys.
+        - State collisions.
+        - Missing initialization checks.
+        - Incorrect state transitions.
+        - Replay attacks.
+        - Double-payment/double-spend possibilities.
+
+        Payroll:
+        - Salary values must not accidentally be exposed.
+        - Verify that commitments/nullifiers are used correctly.
+        - Check that payroll state transitions cannot be manipulated
+          by unauthorized users.
+
+        Also review arithmetic, error handling, panics, and upgrade-related
+        risks.
+
+        Treat security and authorization issues as high priority.
+
+    # ============================================================
+    # NEXT.JS APP
+    # ============================================================
+
+    - path: "app/app/**/*.tsx"
+      instructions: |
+        Review this as a Next.js App Router application.
+
+        Pay particular attention to:
+        - Correct server/client component boundaries.
+        - Incorrect use of browser-only APIs during SSR/prerendering.
+        - localStorage access during server rendering.
+        - Hydration mismatches.
+        - Suspense and dynamic rendering issues.
+        - Wallet-dependent code being executed during build/prerender.
+        - Sensitive payroll data being rendered or exposed unnecessarily.
+        - Incorrect route protection.
+        - Authentication/authorization assumptions.
+
+        Do not assume that hiding a UI element is security.
+        Server-side and contract-level authorization must remain authoritative.
+
+    - path: "app/app/**/page.tsx"
+      instructions: |
+        Review pages for:
+        - SSR/prerender compatibility.
+        - Sensitive payroll information exposure.
+        - Incorrect wallet/auth assumptions.
+        - Accidental static generation of dynamic/private content.
+        - Unsafe URL parameters.
+        - Incorrect use of route params.
+        - Cross-user data leakage.
+
+        Pay special attention to:
+        /dashboard
+        /dashboard/runs/[id]
+        /approve/[runId]
+        /verify/[txHash]
+        /explorer
+
+    # ============================================================
+    # WALLET / AUTH
+    # ============================================================
+
+    - path: "app/lib/wallet-context.tsx"
+      instructions: |
+        Treat wallet handling as security-sensitive.
+
+        Check:
+        - Wallet connection state.
+        - Account identity handling.
+        - Cross-browser/account switching behavior.
+        - Stale wallet state.
+        - Authentication assumptions.
+        - Whether a disconnected or changed wallet can perform
+          actions using stale state.
+
+        Never treat wallet connection alone as sufficient authorization
+        for sensitive operations unless the operation is also authorized
+        by the backend/contract.
+
+    - path: "app/components/auth/**/*.tsx"
+      instructions: |
+        Review route protection carefully.
+
+        Check whether protected UI can be bypassed by directly visiting
+        a route or manipulating client-side state.
+
+        Clearly distinguish:
+        - UI gating
+        - wallet connection
+        - cryptographic authentication
+        - smart-contract authorization
+
+        Flag any situation where client-side protection is being treated
+        as a security boundary.
+
+    # ============================================================
+    # ZK PROVING
+    # ============================================================
+
+    - path: "app/lib/proof.ts"
+      instructions: |
+        Treat this as cryptographic application code.
+
+        Review:
+        - snarkjs Groth16 proof generation.
+        - Circuit input ordering.
+        - Public/private input handling.
+        - Poseidon commitment generation.
+        - Nullifier generation.
+        - Field conversions.
+        - BigInt handling.
+        - Serialization/deserialization.
+        - Browser WASM compatibility.
+        - Accidental logging of private salary data.
+        - Accidental exposure of private witness values.
+
+        Verify that the proof generated by the browser matches the
+        assumptions made by the Soroban verifier.
+
+        Flag any change that could weaken privacy or proof soundness.
+
+    # ============================================================
+    # CONTRACT CLIENT
+    # ============================================================
+
+    - path: "app/lib/contract.ts"
+      instructions: |
+        Review Soroban contract interaction carefully.
+
+        Check:
+        - Contract argument ordering.
+        - XDR/binary encoding.
+        - Proof encoding.
+        - BN254 field element conversion.
+        - Public input ordering.
+        - Transaction simulation.
+        - Transaction signing/submission.
+        - Error handling.
+        - Network/environment configuration.
+        - Incorrect contract IDs or network selection.
+        - Replay/double-submission behavior.
+
+        Verify compatibility with contracts/payroll-verifier.
+
+    # ============================================================
+    # PAYROLL STORE
+    # ============================================================
+
+    - path: "app/lib/payroll-store.ts"
+      instructions: |
+        Payroll data is sensitive.
+
+        Review:
+        - localStorage usage.
+        - Data persistence and retrieval.
+        - Draft/approved/paid state transitions.
+        - Cross-user data leakage.
+        - Wallet/account separation.
+        - Stale state after wallet switching.
+        - Accidental persistence of private salary information.
+        - Sensitive information appearing in logs.
+        - Tampering assumptions.
+
+        Remember that localStorage is controlled by the user and must
+        never be treated as a trusted source of authorization or payroll
+        state.
+
+    # ============================================================
+    # PAYSLIPS / RECEIPTS
+    # ============================================================
+
+    - path: "app/lib/payslip-pdf.tsx"
+      instructions: |
+        Review for accidental exposure of private payroll information.
+
+        Check:
+        - Salary data leakage.
+        - Commitment/nullifier handling.
+        - Sensitive data embedded unnecessarily.
+        - Client-side generation issues.
+        - Incorrect employee/run association.
+
+    - path: "app/lib/receipt.ts"
+      instructions: |
+        Review payroll receipts for privacy and integrity.
+
+        Check:
+        - Sensitive salary data exposure.
+        - Incorrect employee/run association.
+        - Tampering assumptions.
+        - Commitment and transaction hash correctness.
+        - Accidental inclusion of private witness data.
+
+    # ============================================================
+    # PAYROLL WIZARD
+    # ============================================================
+
+    - path: "app/components/dashboard/new-run-wizard.tsx"
+      instructions: |
+        This component contains the core payroll -> proof -> approval ->
+        submission flow.
+
+        Review the entire state machine carefully.
+
+        Check:
+        - Payroll state transitions.
+        - Correct employee/run association.
+        - Proof generation before submission.
+        - Approval before payment.
+        - Wallet identity changes during the flow.
+        - Duplicate submissions.
+        - Retry behavior.
+        - Partial failures.
+        - Stale browser state.
+        - Unauthorized approval/submission.
+        - Salary privacy.
+        - Whether a user can skip a required step by manipulating
+          client-side state.
+
+        Treat the frontend as untrusted and ensure critical guarantees
+        are enforced cryptographically or by the Soroban contract.
+
+    # ============================================================
+    # EXPLORER / PUBLIC VERIFICATION
+    # ============================================================
+
+    - path: "app/app/explorer/**"
+      instructions: |
+        This is a public proof explorer.
+
+        Check carefully for:
+        - Accidental exposure of private payroll information.
+        - Salary leakage.
+        - Private witness leakage.
+        - Nullifier misuse.
+        - Incorrect proof verification display.
+        - Incorrect transaction/proof association.
+        - Unsafe user-controlled query parameters.
+
+        Public verification should reveal only information intended to
+        be public.
+
+    - path: "app/app/verify/**"
+      instructions: |
+        This is a public unauthenticated verification endpoint.
+
+        Review for:
+        - Sensitive data exposure.
+        - Incorrect proof/transaction association.
+        - Unsafe txHash handling.
+        - False-positive verification states.
+        - Client-side-only verification assumptions.
+        - Incorrect display of verification results.
+
+    # ============================================================
+    # GENERAL SECURITY
+    # ============================================================
+
+    - path: "**/*"
+      instructions: |
+        For all changes, prioritize:
+
+        1. Security
+        2. Authorization
+        3. Cryptographic correctness
+        4. Payroll privacy
+        5. Data integrity
+        6. Runtime correctness
+        7. Maintainability
+
+        Flag:
+        - Hardcoded secrets.
+        - Private keys.
+        - API credentials.
+        - Sensitive payroll data in logs.
+        - Client-side authorization used as a security boundary.
+        - Unsafe environment variable usage.
+        - Dependency vulnerabilities.
+        - Insecure cryptographic assumptions.
+        - Race conditions.
+        - Replay attacks.
+        - Double-payment scenarios.
+        - State-machine bypasses.
+
+        Avoid nitpicking formatting or stylistic preferences unless they
+        materially affect correctness or maintainability.
+
+chat:
+  auto_reply: true
+```
