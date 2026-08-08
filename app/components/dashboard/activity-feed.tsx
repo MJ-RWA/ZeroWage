@@ -1,8 +1,7 @@
 'use client'
-
 import { useEffect, useState } from 'react'
 import { ShieldCheck, Banknote, ListPlus, ChevronLeft, ChevronRight } from 'lucide-react'
-import { getPayrollRuns, type PayrollRun } from '@/lib/payroll-store'
+import { getPayrollRunsSync, type PayrollRun } from '@/lib/payroll-store'
 
 interface ActivityItem {
   id: string
@@ -68,7 +67,18 @@ export function ActivityFeed() {
   const [page, setPage] = useState(1)
 
   useEffect(() => {
-    setAll(buildActivity(getPayrollRuns()))
+    // Sync load first — instant, no flicker
+    setAll(buildActivity(getPayrollRunsSync()))
+
+    // Then async refresh from Supabase
+    async function syncRemote() {
+      try {
+        const { getPayrollRuns } = await import('@/lib/payroll-store')
+        const runs = await getPayrollRuns()
+        setAll(buildActivity(runs))
+      } catch {}
+    }
+    syncRemote()
   }, [])
 
   const totalPages = Math.max(1, Math.ceil(all.length / PAGE_SIZE))
@@ -94,9 +104,7 @@ export function ActivityFeed() {
     <div className="rounded-xl border border-border bg-card">
       <div className="border-b border-border px-5 py-3.5 flex items-center justify-between">
         <h2 className="text-sm font-medium text-foreground">Activity</h2>
-        <span className="text-xs text-muted-foreground">
-          {all.length} events
-        </span>
+        <span className="text-xs text-muted-foreground">{all.length} events</span>
       </div>
 
       <ol className="px-5 py-2 min-h-[220px]">
@@ -126,7 +134,6 @@ export function ActivityFeed() {
         })}
       </ol>
 
-      {/* Pagination */}
       {totalPages > 1 && (
         <div className="border-t border-border px-5 py-3 flex items-center justify-between">
           <span className="text-xs text-muted-foreground">
@@ -134,37 +141,37 @@ export function ActivityFeed() {
           </span>
           <div className="overflow-x-auto">
             <div className="flex items-center gap-1 whitespace-nowrap pb-1">
-            <button
-              onClick={() => setPage((p) => Math.max(1, p - 1))}
-              disabled={page === 1}
-              className="flex size-7 items-center justify-center rounded border border-border text-muted-foreground hover:text-foreground disabled:opacity-30 transition-colors"
-            >
-              <ChevronLeft size={13} />
-            </button>
-            {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
               <button
-                key={p}
-                onClick={() => setPage(p)}
-                className={`flex size-7 items-center justify-center rounded border text-xs transition-colors ${
-                  p === page
-                    ? 'border-primary bg-primary/10 text-primary font-medium'
-                    : 'border-border text-muted-foreground hover:text-foreground'
-                }`}
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                disabled={page === 1}
+                className="flex size-7 items-center justify-center rounded border border-border text-muted-foreground hover:text-foreground disabled:opacity-30 transition-colors"
               >
-                {p}
+                <ChevronLeft size={13} />
               </button>
-            ))}
-            <button
-              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-              disabled={page === totalPages}
-              className="flex size-7 items-center justify-center rounded border border-border text-muted-foreground hover:text-foreground disabled:opacity-30 transition-colors"
-            >
-              <ChevronRight size={13} />
-            </button>
-           </div>
-         </div>
-         </div>
-       )}
+              {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
+                <button
+                  key={p}
+                  onClick={() => setPage(p)}
+                  className={`flex size-7 items-center justify-center rounded border text-xs transition-colors ${
+                    p === page
+                      ? 'border-primary bg-primary/10 text-primary font-medium'
+                      : 'border-border text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  {p}
+                </button>
+              ))}
+              <button
+                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                disabled={page === totalPages}
+                className="flex size-7 items-center justify-center rounded border border-border text-muted-foreground hover:text-foreground disabled:opacity-30 transition-colors"
+              >
+                <ChevronRight size={13} />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

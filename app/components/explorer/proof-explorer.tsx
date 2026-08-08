@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { ExternalLink, Shield, Check, Copy } from 'lucide-react'
-import { getPayrollRuns, type PayrollRun } from '@/lib/payroll-store'
+import { getPayrollRunsSync, type PayrollRun } from '@/lib/payroll-store'
 import { cn } from '@/lib/utils'
 
 function CopyBtn({ value }: { value: string }) {
@@ -48,10 +48,20 @@ export function ProofExplorer() {
   const [selectedId, setSelectedId] = useState<string | null>(null)
 
   useEffect(() => {
-    const stored = getPayrollRuns()
-    setRuns(stored)
-    if (stored.length > 0) setSelectedId(stored[0].id)
-  }, [])
+  const sync = getPayrollRunsSync()
+  setRuns(sync)
+  if (sync.length > 0) setSelectedId(sync[0].id)
+
+  async function syncRemote() {
+    try {
+      const { getPayrollRuns } = await import('@/lib/payroll-store')
+      const remote = await getPayrollRuns()
+      setRuns(remote)
+      if (remote.length > 0) setSelectedId((prev) => prev ?? remote[0].id)
+    } catch {}
+  }
+  syncRemote()
+}, [])
 
   const selected = runs.find((r) => r.id === selectedId) ?? null
 

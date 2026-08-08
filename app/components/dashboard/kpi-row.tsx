@@ -12,17 +12,31 @@ export function KpiRow() {
     verifiedRuns: 0,
   })
 
-  useEffect(() => {
-    const runs = getPayrollRuns()
-    const totalPaid = runs.reduce((s, r) => s + r.total, 0)
-    const totalRecipients = runs.reduce((s, r) => s + r.recipients, 0)
-setStats({
-       totalPaid,
-       totalRuns: runs.length,
-       totalRecipients,
-       verifiedRuns: runs.filter((r) => r.status === 'paid').length,
-     })
-  }, [])
+   useEffect(() => {
+  // Sync load first (instant)
+  const { getPayrollRunsSync } = require('@/lib/payroll-store')
+  const syncRuns = getPayrollRunsSync()
+  computeStats(syncRuns)
+
+  // Then async load from Supabase
+  async function syncFromRemote() {
+    const { getPayrollRuns } = require('@/lib/payroll-store')
+    const remoteRuns = await getPayrollRuns()
+    computeStats(remoteRuns)
+  }
+  syncFromRemote()
+}, [])
+
+function computeStats(runs: any[]) {
+  const totalPaid = runs.reduce((s: number, r: any) => s + r.total, 0)
+  const totalRecipients = runs.reduce((s: number, r: any) => s + r.recipients, 0)
+  setStats({
+    totalPaid,
+    totalRuns: runs.length,
+    totalRecipients,
+    verifiedRuns: runs.filter((r: any) => r.status === 'verified' || r.status === 'paid').length,
+  })
+}
 
   const kpis = [
     {

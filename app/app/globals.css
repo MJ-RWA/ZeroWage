@@ -45,6 +45,8 @@
 }
 
 :root {
+  --font-inter: 'Inter', 'Segoe UI', Roboto, system-ui, -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif;
+  --font-jetbrains-mono: 'JetBrains Mono', 'SFMono-Regular', Consolas, 'Liberation Mono', monospace;
   color-scheme: dark;
 
   --background: #0a0b0d;

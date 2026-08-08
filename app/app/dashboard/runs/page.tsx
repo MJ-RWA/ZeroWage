@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { Plus, CheckCircle, ExternalLink } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { getPayrollRuns, type PayrollRun } from '@/lib/payroll-store'
+import { getPayrollRunsSync, type PayrollRun } from '@/lib/payroll-store'
 
 function StatusBadge({ status }: { status: PayrollRun['status'] }) {
    if (status === 'paid') {
@@ -33,12 +33,22 @@ export default function RunsPage() {
   const [runs, setRuns] = useState<PayrollRun[]>([])
 
   useEffect(() => {
-    // Only paid runs live here now — drafts & approved runs live on
-    // /dashboard/pending
-    setRuns(getPayrollRuns().filter((r) => r.status === 'paid'))
-  }, [])
+  // Sync load first
+  const { getPayrollRunsSync } = require('@/lib/payroll-store')
+  setRuns(getPayrollRunsSync().filter((r: any) => r.status === 'paid'))
 
-  const paid = runs.filter((r) => r.status === 'paid').length
+  // Async refresh from Supabase
+  async function syncRemote() {
+    try {
+      const { getPayrollRuns } = await import('@/lib/payroll-store')
+      const remote = await getPayrollRuns()
+      setRuns(remote.filter((r) => r.status === 'paid'))
+    } catch {}
+  }
+  syncRemote()
+}, [])
+
+const paid = runs.filter((r) => r.status === 'paid').length
 
   return (
     <div className="mx-auto max-w-7xl">

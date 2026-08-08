@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { Plus, Clock, ExternalLink, Copy, Check, ArrowRight } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { getPayrollRuns, type PayrollRun } from '@/lib/payroll-store'
+import { getPayrollRunsSync, type PayrollRun } from '@/lib/payroll-store'
 
 function StatusBadge({ status }: { status: PayrollRun['status'] }) {
   if (status === 'approved') {
@@ -53,11 +53,23 @@ export default function PendingPage() {
   const [runs, setRuns] = useState<PayrollRun[]>([])
 
   useEffect(() => {
-    const all = getPayrollRuns()
-    setRuns(
-      all.filter((r) => r.status === 'draft' || r.status === 'approved')
+  setRuns(
+    getPayrollRunsSync().filter(
+      (r) => r.status === 'draft' || r.status === 'approved'
     )
-  }, [])
+  )
+
+  async function syncRemote() {
+    try {
+      const { getPayrollRuns } = await import('@/lib/payroll-store')
+      const remote = await getPayrollRuns()
+      setRuns(remote.filter((r) => r.status === 'draft' || r.status === 'approved'))
+    } catch {}
+  }
+  syncRemote()
+}, []) 
+
+
 
   const drafts = runs.filter((r) => r.status === 'draft').length
   const approved = runs.filter((r) => r.status === 'approved').length

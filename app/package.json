@@ -2,7 +2,7 @@
   "name": "ZeroWage",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "next dev --webpack",
     "build": "next build",
     "start": "next start",
     "lint": "eslint ."
@@ -13,6 +13,7 @@
     "@react-pdf/renderer": "^4.5.1",
     "@stellar/freighter-api": "^6.0.1",
     "@stellar/stellar-sdk": "^16.0.1",
+    "@supabase/supabase-js": "^2.112.2",
     "@vercel/analytics": "^2.0.1",
     "circomlibjs": "^0.1.7",
     "class-variance-authority": "^0.7.1",
