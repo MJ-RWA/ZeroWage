@@ -8,10 +8,40 @@ import { getPayrollRuns, type PayrollRun } from '@/lib/payroll-store'
 export function LatestProof() {
   const [run, setRun] = useState<PayrollRun | null>(null)
 
-  useEffect(() => {
-    const runs = getPayrollRuns()
-    if (runs.length > 0) setRun(runs[0])
-  }, [])
+  
+const [stats, setStats] = useState({
+    totalPaid: 0,
+    totalRuns: 0,
+    totalRecipients: 0,
+    verifiedRuns: 0,
+  })
+
+
+ useEffect(() => {
+  // Sync load first (instant)
+  const { getPayrollRunsSync } = require('@/lib/payroll-store')
+  const syncRuns = getPayrollRunsSync()
+  computeStats(syncRuns)
+
+  // Then async load from Supabase
+  async function syncFromRemote() {
+    const { getPayrollRuns } = require('@/lib/payroll-store')
+    const remoteRuns = await getPayrollRuns()
+    computeStats(remoteRuns)
+  }
+  syncFromRemote()
+}, [])
+
+ function computeStats(runs: any[]) {
+  const totalPaid = runs.reduce((s: number, r: any) => s + r.total, 0)
+  const totalRecipients = runs.reduce((s: number, r: any) => s + r.recipients, 0)
+  setStats({
+    totalPaid,
+    totalRuns: runs.length,
+    totalRecipients,
+    verifiedRuns: runs.filter((r: any) => r.status === 'verified' || r.status === 'paid').length,
+  })
+}
 
   if (!run) {
     return (

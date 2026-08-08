@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { EyeOff, Users, RefreshCw } from 'lucide-react'
-import { getPayrollRuns } from '@/lib/payroll-store'
+import { getPayrollRunsSync, type PayrollRun } from '@/lib/payroll-store'
 import { downloadPayslip, downloadAllPayslips } from '@/lib/download-payslip'
 import { FileText } from 'lucide-react'
 
@@ -22,24 +22,30 @@ export default function EmployeesPage() {
   const [filter, setFilter] = useState('All')
 
   useEffect(() => {
-    load()
-  }, [])
+  buildMap(getPayrollRunsSync().filter((r) => r.status === 'paid'))
 
-  function load() {
-  const runs = getPayrollRuns().filter((r) => r.status === 'paid')
+  async function syncRemote() {
+    try {
+      const { getPayrollRuns } = await import('@/lib/payroll-store')
+      const remote = await getPayrollRuns()
+      buildMap(remote.filter((r) => r.status === 'paid'))
+    } catch {}
+  }
+  syncRemote()
+}, [])
+
+function buildMap(runs: PayrollRun[]) {
   const map = new Map<string, EmployeeRecord>()
-
   for (const run of runs) {
     for (const emp of run.employees) {
       if (!emp.wallet) continue
       const existing = map.get(emp.wallet)
       if (existing) {
-        // Update with latest run data
         existing.latestAmount = emp.amount
         existing.latestCycle = run.cycleId
         existing.latestDate = run.date
         existing.runsCount += 1
-        existing.totalPaid += emp.amount  // accumulate across paid runs
+        existing.totalPaid += emp.amount
         if (emp.department) existing.department = emp.department
       } else {
         map.set(emp.wallet, {
@@ -55,7 +61,6 @@ export default function EmployeesPage() {
       }
     }
   }
-
   setEmployees(Array.from(map.values()))
 }
 
@@ -75,7 +80,7 @@ export default function EmployeesPage() {
           </p>
         </div>
         <button
-          onClick={load}
+          onClick={() => buildMap(getPayrollRunsSync().filter((r) => r.status === 'paid'))}
           className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
         >
           <RefreshCw size={12} />

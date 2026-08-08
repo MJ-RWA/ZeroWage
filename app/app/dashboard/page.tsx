@@ -1,23 +1,31 @@
 'use client'
-
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { ArrowRight, Plus } from 'lucide-react'
+import { ArrowRight, Plus, CheckCircle, ExternalLink, Download, Share2 } from 'lucide-react'
 import { KpiRow } from '@/components/dashboard/kpi-row'
 import { LatestProof } from '@/components/dashboard/latest-proof'
 import { ActivityFeed } from '@/components/dashboard/activity-feed'
-import { getPayrollRuns, type PayrollRun } from '@/lib/payroll-store'
-import { CheckCircle, ExternalLink } from 'lucide-react'
+import { getPayrollRunsSync, type PayrollRun } from '@/lib/payroll-store'
 import { Button } from '@/components/ui/button'
 import { downloadReceipt, downloadReceiptJson } from '@/lib/receipt'
-import { Download, Share2 } from 'lucide-react'
 import { toast } from 'sonner'
 
 export default function DashboardPage() {
   const [runs, setRuns] = useState<PayrollRun[]>([])
 
   useEffect(() => {
-    setRuns(getPayrollRuns())
+    // Sync load — instant, no flicker
+    setRuns(getPayrollRunsSync())
+
+    // Async refresh from Supabase
+    async function syncRemote() {
+      try {
+        const { getPayrollRuns } = await import('@/lib/payroll-store')
+        const remote = await getPayrollRuns()
+        setRuns(remote)
+      } catch {}
+    }
+    syncRemote()
   }, [])
 
   const currentMonth = new Date().toLocaleString('default', {
@@ -42,7 +50,7 @@ export default function DashboardPage() {
         <KpiRow />
       </div>
 
-      <div className="mt-8 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div className="mt-8 grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2">
           <div className="mb-3 flex items-center justify-between">
             <h2 className="text-sm font-medium text-foreground">
@@ -59,9 +67,7 @@ export default function DashboardPage() {
 
           {runs.length === 0 ? (
             <div className="rounded-xl border border-dashed border-border py-14 text-center">
-              <p className="text-sm text-muted-foreground">
-                No payroll runs yet.
-              </p>
+              <p className="text-sm text-muted-foreground">No payroll runs yet.</p>
               <Button asChild className="mt-4 gap-1.5">
                 <Link href="/dashboard/new">
                   <Plus className="size-4" />
@@ -71,14 +77,14 @@ export default function DashboardPage() {
             </div>
           ) : (
             <div className="overflow-x-auto rounded-xl border border-border bg-card">
-              <table className="w-full text-left text-sm">
+              <table className="w-full text-left text-sm min-w-[540px]">
                 <thead>
                   <tr className="border-b border-border text-xs text-muted-foreground">
-                    <th className="px-5 py-3 font-medium">Cycle</th>
-                    <th className="px-5 py-3 font-medium">Recipients</th>
-                    <th className="px-5 py-3 text-right font-medium">Total</th>
-                    <th className="px-5 py-3 font-medium">Status</th>
-                    <th className="px-5 py-3" />
+                    <th className="px-4 py-3 font-medium">Cycle</th>
+                    <th className="px-4 py-3 font-medium">Recip.</th>
+                    <th className="px-4 py-3 text-right font-medium">Total</th>
+                    <th className="px-4 py-3 font-medium">Status</th>
+                    <th className="px-4 py-3 font-medium">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -87,76 +93,69 @@ export default function DashboardPage() {
                       key={run.id}
                       className="border-b border-border/70 last:border-0 hover:bg-accent/30 transition-colors"
                     >
-                      <td className="px-5 py-4 font-medium text-foreground">
+                      <td className="px-4 py-3 font-medium text-foreground">
                         <Link
-                          href={`/dashboard/runs/${run.id}`}
+                          href={`/dashboard/runs/${encodeURIComponent(run.id)}`}
                           className="hover:text-primary transition-colors"
                         >
                           {run.cycleId}
                         </Link>
                       </td>
-                      <td className="px-5 py-4 font-mono text-foreground">
+                      <td className="px-4 py-3 font-mono text-foreground">
                         {run.recipients}
                       </td>
-                      <td className="px-5 py-4 text-right font-mono font-semibold text-foreground">
+                      <td className="px-4 py-3 text-right font-mono font-semibold text-foreground">
                         {run.total.toLocaleString()} USDC
                       </td>
-                      <td className="px-5 py-4">
-                        <span className="inline-flex items-center gap-1.5 rounded-full bg-success/10 px-2.5 py-1 text-xs font-mono text-success ring-1 ring-inset ring-success/20">
-                          <CheckCircle size={10} />
-                          VERIFIED
-                        </span>
+                      <td className="px-4 py-3">
+                        <StatusBadge status={run.status} />
                       </td>
-                      <td className="px-5 py-4">
-                        <div className="flex items-center gap-2">
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-1.5">
+                          {/* Download receipt */}
+                          <button
+                            onClick={() => downloadReceipt(run)}
+                            title="Download receipt (.txt)"
+                            className="flex size-7 items-center justify-center rounded border border-border text-muted-foreground hover:text-foreground hover:border-primary/30 transition-colors"
+                          >
+                            <Download size={12} />
+                          </button>
+
+                          {/* Copy attestation link */}
+                          {run.proofTxHash && (
+                            <button
+                              onClick={async () => {
+                                const url = `${window.location.origin}/verify/${run.proofTxHash}`
+                                await navigator.clipboard.writeText(url)
+                                toast.success('Attestation link copied')
+                              }}
+                              title="Copy attestation link"
+                              className="flex size-7 items-center justify-center rounded border border-border text-muted-foreground hover:text-foreground hover:border-primary/30 transition-colors"
+                            >
+                              <Share2 size={12} />
+                            </button>
+                          )}
+
+                          {/* Stellar Expert */}
+                          {run.proofTxHash && (
+                            <a
+                              href={`https://stellar.expert/explorer/testnet/tx/${run.proofTxHash}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              title="View on Stellar Expert"
+                              className="flex size-7 items-center justify-center rounded border border-border text-muted-foreground hover:text-primary hover:border-blue-500/30 transition-colors"
+                            >
+                              <ExternalLink size={12} />
+                            </a>
+                          )}
+
+                          {/* Details */}
                           <Link
-                            href={`/dashboard/runs/${run.id}`}
-                            className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+                            href={`/dashboard/runs/${encodeURIComponent(run.id)}`}
+                            className="text-xs text-muted-foreground hover:text-foreground transition-colors ml-1"
                           >
-                            Details
+                            Details →
                           </Link>
-
-                          <Button
-                          variant="outline"
-                          className="gap-1.5 border-border bg-card hover:bg-accent"
-                          onClick={() => downloadReceipt(run)}
-                          >
-                         <Download className="size-4" />
-                         Receipt (.txt)
-                        </Button>
-
-                       <Button
-                        variant="outline"
-                        className="gap-1.5 border-border bg-card hover:bg-accent"
-                        onClick={() => downloadReceiptJson(run)}
-                        >
-                        <Download className="size-4" />
-                         Receipt (.json)
-                         </Button>
-                    
-                        {run.proofTxHash && (
-                        <Button
-                        variant="outline"
-                        className="gap-1.5 border-border bg-card hover:bg-accent"
-                        onClick={async () => {
-                        const url = `${window.location.origin}/verify/${run.proofTxHash}`
-                        await navigator.clipboard.writeText(url)
-                        toast.success('Attestation link copied')
-                        }}
-                        >
-                        <Share2 className="size-4" />
-                        Copy attestation link
-                        </Button>
-                        )} 
-
-                          <a
-                            href={`https://stellar.expert/explorer/testnet/tx/${run.proofTxHash}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-muted-foreground hover:text-primary transition-colors"
-                          >
-                            <ExternalLink size={12} />
-                          </a>
                         </div>
                       </td>
                     </tr>
@@ -173,5 +172,28 @@ export default function DashboardPage() {
         </div>
       </div>
     </div>
+  )
+}
+
+function StatusBadge({ status }: { status: string }) {
+  if (status === 'paid') {
+    return (
+      <span className="inline-flex items-center gap-1.5 rounded-full bg-success/10 px-2.5 py-1 text-xs font-mono text-success ring-1 ring-inset ring-success/20">
+        <CheckCircle size={10} />
+        PAID
+      </span>
+    )
+  }
+  if (status === 'approved') {
+    return (
+      <span className="inline-flex items-center gap-1.5 rounded-full bg-blue-500/10 px-2.5 py-1 text-xs font-mono text-blue-400 ring-1 ring-inset ring-blue-500/20">
+        APPROVED
+      </span>
+    )
+  }
+  return (
+    <span className="inline-flex items-center gap-1.5 rounded-full bg-yellow-500/10 px-2.5 py-1 text-xs font-mono text-yellow-400 ring-1 ring-inset ring-yellow-500/20">
+      DRAFT
+    </span>
   )
 }
