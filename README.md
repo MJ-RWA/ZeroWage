@@ -328,11 +328,57 @@ zerowage/
 ## Quick Start
 
 ```bash
-git clone https://github.com/yourusername/zerowage
-cd zerowage/app
-npm install
-npm run dev
+git clone https://github.com/MJ-RWA/ZeroWage
+cd ZeroWage/app
+pnpm install
+pnpm run dev
 # → http://localhost:3000
+```
+
+### Environment variables
+
+Create `.env.local` in the `app/` directory:
+
+```bash
+cp .env.example .env.local
+```
+
+Then fill in your values:
+
+NEXT_PUBLIC_SUPABASE_URL=https://yourproject.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key-here
+
+
+### Supabase setup (required for cross-device salary storage)
+
+1. Create a free project at [supabase.com](https://supabase.com)
+2. Go to **SQL Editor** and run:
+
+```sql
+create table payroll_runs (
+  id text primary key,
+  wallet_address text not null,
+  encrypted_data text not null,
+  created_at timestamp with time zone default now(),
+  updated_at timestamp with time zone default now()
+);
+
+alter table payroll_runs enable row level security;
+
+create policy "Allow all operations"
+  on payroll_runs for all
+  using (true)
+  with check (true);
+```
+
+3. Copy your **Project URL** and **anon public key** from Settings → API into `.env.local`
+
+> **Privacy note:** Supabase stores only AES-GCM encrypted ciphertext. The encryption key is derived from your Stellar wallet address using PBKDF2 and never leaves your browser. Supabase cannot read your salary data.
+
+### Without Supabase
+
+The app works without Supabase — salary data falls back to `localStorage`. You won't lose functionality, but history won't sync across devices. Simply leave the Supabase environment variables empty.
+
 ```
 
 The `.zkey` and `.ptau` artifacts are large binaries and aren't committed. Regenerate them:
