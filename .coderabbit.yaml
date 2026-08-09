@@ -1,4 +1,3 @@
-```yaml
 language: "en-US"
 
 reviews:
@@ -405,4 +404,3 @@ reviews:
 
 chat:
   auto_reply: true
-```
