@@ -1008,10 +1008,28 @@ function DraftStep({
       </div>
 
       {/* Polling indicator */}
-      <div className="flex items-center gap-2 text-xs text-muted-foreground mb-5">
-        <div className="size-2 rounded-full bg-yellow-400 animate-pulse" />
-         Listening for approval on Stellar...
+       <div className="rounded-lg border border-border bg-background p-4 mb-5">
+      <div className="text-xs text-muted-foreground uppercase tracking-widest mb-3">
+       Approval progress
       </div>
+       {[
+       { label: settings.approverWallet || 'Approver 1', required: true },
+       ...(settings.secondApproverWallet
+      ? [{ label: settings.secondApproverWallet, required: true }]
+      : []),
+      ].map((approver, i) => (
+       <div key={i} className="flex items-center gap-3 py-2 border-b border-border last:border-0">
+      <div className="size-2 rounded-full bg-yellow-400 animate-pulse" />
+      <span className="font-mono text-xs text-muted-foreground flex-1">
+        {approver.label.slice(0, 8)}...{approver.label.slice(-6)}
+      </span>
+      <span className="text-xs text-muted-foreground">Waiting</span>
+    </div>
+      ))}
+     <p className="text-xs text-muted-foreground mt-3">
+        Each approver sends a 1 XLM memo payment to signal approval.
+    </p>
+   </div>
 
       {/* Self-approve fallback */}
       {!hasApprover && (
