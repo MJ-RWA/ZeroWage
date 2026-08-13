@@ -9,6 +9,12 @@ export interface PayrollEmployee {
   department?: string
 }
 
+export interface ApprovalEntry {
+  wallet: string
+  approvedAt: string
+  txHash: string
+}
+
 export interface PayrollRun {
   id: string
   cycleId: string
@@ -21,6 +27,9 @@ export interface PayrollRun {
   status: 'draft' | 'approved' | 'paid'
   proofData?: any
   approverWallet?: string
+  approvers?: string[]             // all configured approver wallets
+  requiredApprovals?: number       // threshold (default 1)
+  approvalEntries?: ApprovalEntry[] 
   approvalSignature?: string
   approvedAt?: string
 }
@@ -56,6 +65,56 @@ async function getWalletAddress(): Promise<string | null> {
   } catch {
     return null
   }
+}
+
+export async function recordApproval(
+  runId: string,
+  approverWallet: string,
+  txHash: string
+): Promise<void> {
+  const runs = getLocalRuns()
+  const updated = runs.map((r) => {
+    if (r.id !== runId) return r
+
+    const entries = r.approvalEntries || []
+
+    // Don't add duplicate
+    if (entries.some((e) => e.wallet === approverWallet)) return r
+
+    const newEntry: ApprovalEntry = {
+      wallet: approverWallet,
+      approvedAt: new Date().toUTCString(),
+      txHash,
+    }
+
+    const newEntries = [...entries, newEntry]
+    const required = r.requiredApprovals || 1
+    const isComplete = newEntries.length >= required
+
+    return {
+      ...r,
+      approvalEntries: newEntries,
+      status: isComplete ? ('approved' as const) : r.status,
+      approvedAt: isComplete ? new Date().toUTCString() : r.approvedAt,
+    }
+  })
+
+  setLocalRuns(updated)
+
+  const wallet = await getWalletAddress()
+  if (wallet) saveToSupabase(updated, wallet)
+}
+
+export function getApprovalCount(run: PayrollRun): number {
+  return run.approvalEntries?.length || (run.approvalSignature ? 1 : 0)
+}
+
+export function getRequiredApprovals(run: PayrollRun): number {
+  return run.requiredApprovals || 1
+}
+
+export function isApprovalComplete(run: PayrollRun): boolean {
+  return getApprovalCount(run) >= getRequiredApprovals(run)
 }
 
 async function saveToSupabase(

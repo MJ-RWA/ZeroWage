@@ -1,4 +1,6 @@
-#![no_std]
+const fs = require('fs');
+
+const code = `#![no_std]
 use soroban_sdk::{
     contract, contracterror, contractimpl, contracttype,
     crypto::bn254::{
@@ -269,15 +271,28 @@ impl PayrollVerifier {
         let threshold_opt: Option<u32> = env
             .storage().instance().get(&THRESHOLD_KEY);
 
-         if let Some(threshold) = threshold_opt {
-    if threshold > 1 {
-        let approval_key = (
-            symbol_short!("APPR"),
-            (employer.clone(), cycle_id.clone()),
-        );
-    }
+        if let Some(threshold) = threshold_opt {
+            if threshold > 1 {
+                let run_key = String::from_str(
+                    &env,
+                    &soroban_sdk::xdr::ToXdr::to_xdr(
+                        &employer, &env
+                    ).to_string()
+                );
+                // Build run key as employer + cycle_id
+                let approval_key = (
+                    symbol_short!("APPR"),
+                    (employer.clone(), cycle_id.clone()),
+                );
+                let record: Option<ApprovalRecord> = env
+                    .storage().persistent().get(&approval_key);
 
-}
+                match record {
+                    Some(r) if r.is_complete => {},
+                    _ => return Err(VerifierError::ThresholdNotMet),
+                }
+            }
+        }
 
         // 2. Nullifier check
         let nullifier  = nullifier_from_proof(&env, &proof_bytes);
@@ -469,12 +484,12 @@ mod test {
 
         // First approval
         let run_key = String::from_str(&env, "EMPLOYER1:JUNE-2026");
-        let count1 = client.record_approval(&run_key, &approver1);
-        assert_eq!(count1, 1u32);
+        let count1 = client.record_approval(&run_key, &approver1).unwrap();
+        assert_eq!(count1, 1);
 
         // Second approval — threshold met
-        let count2 = client.record_approval(&run_key, &approver2);
-        assert_eq!(count2, 2u32);
+        let count2 = client.record_approval(&run_key, &approver2).unwrap();
+        assert_eq!(count2, 2);
 
         // Check status
         let status = client.get_approval_status(&run_key);
@@ -512,7 +527,7 @@ mod test {
         client.set_approvers(&approvers, &1u32);
 
         let run_key = String::from_str(&env, "EMPLOYER1:JUNE-2026");
-        let _: u32 = client.record_approval(&run_key, &approver);
+        client.record_approval(&run_key, &approver).unwrap();
 
         // Second approval from same wallet — must fail
         let result = client.try_record_approval(&run_key, &approver);
@@ -561,3 +576,7 @@ mod test {
         assert_eq!(run.timestamp, 9999999);
     }
 }
+`;
+
+fs.writeFileSync('contracts/hello-world/src/lib.rs', code);
+console.log('Contract v2 written');

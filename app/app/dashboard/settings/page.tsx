@@ -45,6 +45,8 @@ interface Settings {
   role: string
   teamSize: string
   approverWallet: string
+  secondApproverWallet: string // second approver (2-of-2)
+  requiredApprovals: number 
 }
 
 export default function SettingsPage() {
@@ -56,6 +58,8 @@ export default function SettingsPage() {
    role: '',
    teamSize: '',
    approverWallet: '',
+   secondApproverWallet: '',
+   requiredApprovals: 1,
   })
   const [saved, setSaved] = useState(false)
 
@@ -134,6 +138,39 @@ export default function SettingsPage() {
             setSettings((prev) => ({ ...prev, approverWallet: v }))
            }
           />
+
+          <Field
+          label="Second approver wallet"
+          value={settings.secondApproverWallet}
+          hint="Optional — enables 2-of-2 approval requirement"
+          onChange={(v) =>
+          setSettings((prev) => ({ ...prev, secondApproverWallet: v }))
+          }
+          />
+
+          <div className="grid gap-2 border-b border-border py-5 last:border-0 md:grid-cols-[240px_1fr] md:items-center md:gap-6">
+          <div>
+          <p className="text-sm font-medium text-foreground">Required approvals</p>
+          <p className="mt-0.5 text-xs text-muted-foreground">
+           How many approvers must sign before payroll can be submitted
+          </p>
+          </div>
+          <div className="flex gap-2">
+          {[1, 2].map((n) => (
+          <button
+           key={n}
+           onClick={() => setSettings((prev) => ({ ...prev, requiredApprovals: n }))}
+          className={`rounded-lg border px-4 py-2 text-sm transition-colors ${
+          settings.requiredApprovals === n
+            ? 'border-primary bg-primary/10 text-primary'
+            : 'border-border text-muted-foreground hover:text-foreground'
+          }`}
+          >
+          {n}-of-{settings.secondApproverWallet ? 2 : 1}
+          </button>
+          ))}
+          </div>
+          </div>
 
           <Field
             label="Default asset"
