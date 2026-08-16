@@ -1,5 +1,7 @@
 # ZeroWage
 
+📖 [Léame en Español (README.es.md)](./README.es.md)
+
 [![Live on Stellar Testnet](https://img.shields.io/badge/Stellar-Testnet-blue?logo=stellar)](https://stellar.expert/explorer/testnet/contract/CCOEJ6QC6ZGGA2GIY72IW3MDN6LNJHQSB2XWRZR3WSLE3PVVE6QVUYAP)
 [![Real Groth16 Verification](https://img.shields.io/badge/On--Chain-BN254%20Pairing%20Verified-purple)](#the-verifier-itself-does-the-math)
 [![Soroban Smart Contract](https://img.shields.io/badge/Contract-Soroban%20Rust-orange)](https://stellar.org/developers/soroban)
