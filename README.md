@@ -476,3 +476,7 @@ Beyond the cryptography, Stellar is simply the right chain for moving payroll: U
 ---
 
 *A payroll spreadsheet has always had two columns nobody could reconcile: who gets paid, and who's allowed to know. ZeroWage doesn't pick a side. It proves the first column is correct and makes the second column irrelevant — not by promising to keep a secret, but by never knowing it in the first place.*
+
+
+## Documentation
+- [[documentation] Translate README to Spanish](README.es.md)
