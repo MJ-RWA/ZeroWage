@@ -1,0 +1,53 @@
+name: Soroban Contract Tests
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'contracts/**'
+      - '.github/workflows/contract-tests.yml'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'contracts/**'
+      - '.github/workflows/contract-tests.yml'
+
+jobs:
+  test:
+    name: Run contract unit tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32v1-none
+
+      - name: Cache Rust dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            contracts/payroll-verifier/target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('contracts/payroll-verifier/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
+
+      - name: Run contract tests
+        working-directory: contracts/payroll-verifier
+        run: cargo test --verbose 2>&1
+
+      - name: Build contract WASM
+        working-directory: contracts/payroll-verifier
+        run: cargo build --target wasm32v1-none --release 2>&1
+
+      - name: Report test results
+        if: always()
+        run: |
+          echo "Contract: CCOEJ6QC6ZGGA2GIY72IW3MDN6LNJHQSB2XWRZR3WSLE3PVVE6QVUYAP"
+          echo "Network: Stellar Testnet"
+          echo "Circuit: payroll.circom v3 — 1,205 constraints, Groth16/BN254"
