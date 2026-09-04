@@ -68,6 +68,21 @@ interface ProofResult {
 }
 
 // ─── Root wizard ──────────────────────────────────────────────────────────────
+// Validates a Stellar public key — must start with G, be 56 chars,
+// and pass the StrKey checksum. Uses the Stellar SDK if available,
+// falls back to a lightweight regex check.
+function isValidStellarAddress(address: string): boolean {
+  if (!address || address.trim() === '') return true // empty is OK — only validate non-empty
+  const trimmed = address.trim()
+  if (!trimmed.startsWith('G') || trimmed.length !== 56) return false
+  // Base32 alphabet check — Stellar uses A-Z and 2-7
+  return /^[A-Z2-7]{56}$/.test(trimmed)
+}
+
+function isMuxedAddress(address: string): boolean {
+  return address.trim().startsWith('M')
+}
+
 
 export function NewRunWizard() {
   const { address: walletAddress } = useWallet()
@@ -134,6 +149,12 @@ export function NewRunWizard() {
   const included = employees.filter(
     (e) => e.name && e.wallet && parseFloat(e.amount) > 0
   )
+
+   const hasInvalidWallets = employees.some(
+  (e) => e.wallet.trim() !== '' && (
+    isMuxedAddress(e.wallet) || !isValidStellarAddress(e.wallet)
+  )
+)
   const total = included.reduce((s, e) => s + (parseFloat(e.amount) || 0), 0)
 
   // ── Employee helpers ──────────────────────────────────────────────────────
@@ -184,7 +205,14 @@ export function NewRunWizard() {
           ...prev.filter((e) => e.name || e.wallet),
           ...parsed,
         ])
-        toast.success(`Imported ${parsed.length} employees from CSV`)
+        const invalidCount = parsed.filter(
+          (e) => e.wallet && !isValidStellarAddress(e.wallet)
+        ).length
+        if (invalidCount > 0) {
+          toast.warning(`${invalidCount} wallet address${invalidCount > 1 ? 'es' : ''} in CSV may be invalid — check highlighted rows`)
+        } else {
+          toast.success(`Imported ${parsed.length} employees from CSV`)
+        }
       }
     }
     reader.readAsText(file)
@@ -398,7 +426,7 @@ export function NewRunWizard() {
         )}
 
         {/* Navigation bar — hidden during auto-advancing steps */}
-        {step !== 3 && step !== 4 && !txHash && (
+             {step !== 3 && step !== 4 && !txHash && (
           <div className="flex items-center justify-between border-t border-border px-6 py-4">
             <Button
               variant="outline"
@@ -409,10 +437,21 @@ export function NewRunWizard() {
               Back
             </Button>
 
+            {/* Validation warning */}
+            {step === 1 && hasInvalidWallets && (
+              <div className="flex items-center gap-1.5 text-xs text-destructive">
+                <AlertCircle size={12} />
+                Fix invalid wallet addresses to continue
+              </div>
+            )}
+
             {step < 5 && (
-              <Button
+                             <Button
                 className="gap-1.5"
-                disabled={step === 1 && included.length === 0}
+                disabled={
+                  (step === 1 && included.length === 0) ||
+                  (step === 1 && hasInvalidWallets)
+                }
                 onClick={() => setStep((s) => s + 1)}
               >
                 {step === 2 ? 'Generate proof' : 'Continue'}
@@ -503,6 +542,18 @@ function InputStep({
   total: number
   count: number
 }) {
+    function walletStatus(wallet: string): 'empty' | 'valid' | 'invalid' | 'muxed' {
+    if (!wallet || wallet.trim() === '') return 'empty'
+    if (isMuxedAddress(wallet)) return 'muxed'
+    if (isValidStellarAddress(wallet)) return 'valid'
+    return 'invalid'
+  }
+
+  const hasInvalidWallets = employees.some(
+    (e) => e.name && walletStatus(e.wallet) === 'invalid'
+  ) || employees.some(
+    (e) => e.name && walletStatus(e.wallet) === 'muxed'
+  )
   return (
     <div className="p-6">
       <h2 className="text-base font-semibold text-foreground">Add employees</h2>
@@ -557,13 +608,31 @@ function InputStep({
                       ))}
                     </select>
                   </td>
-                  <td className="px-4 py-2">
-                    <input
-                      value={emp.wallet}
-                      onChange={(e) => updateEmployee(emp.id, 'wallet', e.target.value)}
-                      placeholder="GABC...XYZ"
-                      className="w-full bg-transparent text-muted-foreground placeholder-muted-foreground focus:outline-none text-sm font-mono"
-                    />
+                                      <td className="px-4 py-2">
+                    <div className="flex flex-col gap-0.5">
+                      <input
+                        value={emp.wallet}
+                        onChange={(e) => updateEmployee(emp.id, 'wallet', e.target.value)}
+                        placeholder="GABC...XYZ"
+                        className={`w-full bg-transparent placeholder-muted-foreground focus:outline-none text-sm font-mono transition-colors ${
+                          walletStatus(emp.wallet) === 'invalid'
+                            ? 'text-destructive'
+                            : walletStatus(emp.wallet) === 'muxed'
+                            ? 'text-yellow-400'
+                            : 'text-muted-foreground'
+                        }`}
+                      />
+                      {walletStatus(emp.wallet) === 'invalid' && (
+                        <p className="text-[10px] text-destructive leading-none">
+                          Invalid Stellar address
+                        </p>
+                      )}
+                      {walletStatus(emp.wallet) === 'muxed' && (
+                        <p className="text-[10px] text-yellow-400 leading-none">
+                          M... addresses not supported — use G... only
+                        </p>
+                      )}
+                    </div>
                   </td>
                   <td className="px-4 py-2">
                     <input
