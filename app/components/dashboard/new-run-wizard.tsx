@@ -782,6 +782,8 @@ function ReviewStep({
 
 // ─── Step 3 — Generate Proof ──────────────────────────────────────────────────
 
+// ─── Step 3 – Generate Proof ──────────────────────────────────────────────────
+
 function GenerateStep({
   employees, total, cycleId, onDone,
 }: {
@@ -790,14 +792,43 @@ function GenerateStep({
   cycleId: string
   onDone: (result: ProofResult) => void
 }) {
-  const [logs, setLogs]           = useState<string[]>([])
+  const [logs, setLogs]             = useState<string[]>([])
   const [isComplete, setIsComplete] = useState(false)
-  const [error, setError]         = useState<string | null>(null)
-  const ranRef                    = useRef(false)
+  const [error, setError]           = useState<string | null>(null)
+  const [progress, setProgress]     = useState(0)
+  const ranRef                      = useRef(false)
+  const rafRef                      = useRef<number | null>(null)
+  const startRef                    = useRef<number | null>(null)
+
+  // Simulated progress: 0% → 90% over ~2 seconds using rAF
+  // Jumps to 100% when proof resolves
+  function startProgress() {
+    const DURATION = 2000 // ms — matches typical proof time
+    startRef.current = performance.now()
+
+    function tick() {
+      if (!startRef.current) return
+      const elapsed = performance.now() - startRef.current
+      const pct = Math.min(90, (elapsed / DURATION) * 90)
+      setProgress(Math.round(pct))
+      if (pct < 90) {
+        rafRef.current = requestAnimationFrame(tick)
+      }
+    }
+
+    rafRef.current = requestAnimationFrame(tick)
+  }
+
+  function stopProgress(complete: boolean) {
+    if (rafRef.current) cancelAnimationFrame(rafRef.current)
+    setProgress(complete ? 100 : 0)
+  }
 
   useEffect(() => {
     if (ranRef.current) return
     ranRef.current = true
+
+    startProgress()
 
     const salaries = employees.map((e) => parseFloat(e.amount))
 
@@ -805,16 +836,23 @@ function GenerateStep({
       setLogs((prev) => [...prev, msg])
     )
       .then((result) => {
+        stopProgress(true)
         setIsComplete(true)
         setTimeout(() => onDone(result as ProofResult), 800)
       })
       .catch((e) => {
+        stopProgress(false)
         setError(e?.message || 'Proof generation failed')
       })
+
+    return () => {
+      if (rafRef.current) cancelAnimationFrame(rafRef.current)
+    }
   }, [employees, onDone])
 
   return (
     <div className="p-6">
+      {/* Header */}
       <div className="flex items-center gap-3">
         <span className="flex size-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
           {isComplete ? (
@@ -835,7 +873,41 @@ function GenerateStep({
         </div>
       </div>
 
-      <div className="mt-5 rounded-lg border border-border bg-background p-4 font-mono text-xs space-y-1">
+      {/* Progress bar */}
+      {!error && (
+        <div className="mt-5">
+          <div className="flex items-center justify-between mb-1.5">
+            <span className="text-xs text-muted-foreground font-mono">
+              {isComplete ? 'Complete' : 'Proving...'}
+            </span>
+            <span className="text-xs font-mono font-semibold text-foreground tabular-nums">
+              {progress}%
+            </span>
+          </div>
+          <div className="h-1.5 w-full rounded-full bg-border overflow-hidden">
+            <div
+              className={`h-full rounded-full transition-all duration-200 ${
+                isComplete ? 'bg-success' : 'bg-primary'
+              }`}
+              style={{ width: `${progress}%` }}
+            />
+          </div>
+          {/* Constraint count below the bar */}
+          <div className="flex items-center justify-between mt-1.5">
+            <span className="text-[10px] text-muted-foreground font-mono">
+              1,205 constraints · Groth16 · BN254
+            </span>
+            {!isComplete && (
+              <span className="text-[10px] text-muted-foreground font-mono">
+                ~2 seconds
+              </span>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Log terminal */}
+      <div className="mt-4 rounded-lg border border-border bg-background p-4 font-mono text-xs space-y-1">
         {logs.map((log, i) => (
           <div key={i} className="flex items-center gap-2 py-0.5">
             <span className="text-muted-foreground">{'>'}</span>
@@ -846,7 +918,9 @@ function GenerateStep({
         {!isComplete && !error && (
           <div className="flex items-center gap-2 py-0.5 opacity-40">
             <span className="text-muted-foreground">{'>'}</span>
-            <span className="animate-pulse text-muted-foreground">running circuit...</span>
+            <span className="animate-pulse text-muted-foreground">
+              running circuit...
+            </span>
           </div>
         )}
         {error && (
@@ -856,11 +930,12 @@ function GenerateStep({
         )}
       </div>
 
+      {/* Success banner */}
       {isComplete && (
         <div className="mt-4 flex items-center gap-2 rounded-lg border border-success/20 bg-success/5 px-4 py-3">
           <Check className="size-4 text-success shrink-0" />
           <span className="text-sm text-success font-medium">
-            Proof generated · 660 constraints satisfied · salaries hidden
+            Proof generated · 1,205 constraints satisfied · salaries hidden
           </span>
         </div>
       )}
