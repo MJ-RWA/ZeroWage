@@ -439,6 +439,34 @@ https://zerowage.xyz/verify/[proofTxHash]
 
 ---
 
+## FAQ
+
+**Q: Can the employer lie about the salaries?**
+
+A: The circuit proves the math is consistent but cannot verify that salaries match employment contracts. ZeroWage proves cryptographic correctness, not legal compliance.
+
+**Q: Who holds the decryption keys?**
+
+A: Nobody. Salary data is encrypted with a key derived from the admin's Stellar wallet address using PBKDF2. The key never leaves the browser. Not even Supabase or ZeroWage can decrypt it.
+
+**Q: Is this production-ready?**
+
+A: Not yet. The current deployment is on Stellar testnet with a single-contributor trusted setup. Production would require a multi-party ceremony and mainnet deployment.
+
+**Q: What exactly does the ZK proof prove?**
+
+A: Three things: (1) the claimed total equals the actual sum of salaries, (2) no salary is below the configured minimum, (3) this proof is bound to this specific salary batch via a Poseidon hash.
+
+**Q: Can the same proof be submitted twice?**
+
+A: No. The contract stores a SHA-256 nullifier of every accepted proof and rejects duplicates with `ProofAlreadyUsed`.
+
+**Q: Does ZeroWage custody any funds?**
+
+A: No. ZeroWage is entirely non-custodial. All payments go directly from the admin's wallet to employee wallets via Stellar operations.
+
+---
+
 ## Why Stellar
 
 This project doesn't run on Stellar by default — it runs on Stellar because nowhere else was it possible. The X-Ray protocol upgrade shipped native BN254 host functions (`bn254_g1_mul`, `bn254_g1_add`, `bn254_pairing_check`) directly into Soroban. On Ethereum, a Groth16 pairing check costs hundreds of thousands of gas; on Stellar, the same verification settles for a fraction of a cent, in seconds. Without that primitive, this entire architecture collapses into either an off-chain trust assumption or an economically nonviable on-chain check.
